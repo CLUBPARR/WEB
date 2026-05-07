@@ -903,14 +903,31 @@ function App() {
 
   // Save reservation to Supabase
   const handleReserve = async (eventObj, formData) => {
-    await sb.from('reservations').insert({
-      event_id: eventObj.id || null,
-      event_title: eventObj.title,
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone || null,
-      note: formData.note || null,
-    });
+    try {
+      // Guardar en base de datos
+      await sb.from('reservations').insert({
+        event_id: eventObj.id || null,
+        event_title: eventObj.title,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || null,
+        note: formData.note || null,
+      });
+
+      // Enviar email
+      await fetch('https://yeyuqwaqitaysyyidiwa.supabase.co/functions/v1/send-reservation-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          event_title: eventObj.title,
+          note: formData.note
+        })
+      });
+    } catch (e) {
+      console.error('Error en reservación:', e);
+    }
   };
 
   return (
