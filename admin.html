@@ -40,14 +40,21 @@ const prodFromDB = r => ({ id: r.id, name: r.name, price: r.price, type: r.type,
 const prodToDB   = p => ({ name: p.name, price: Number(p.price), type: p.type, descripcion: p.desc, bg: p.bg, imgs: p.imgs||[], sizes: p.sizes||[], active: !!p.active });
 const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null });
 const galToDB    = g => ({ label: g.label, date: g.date, img: g.img||null });
-const settFromDB = r => ({ clubName: r.club_name, city: r.city, email: r.email, instagram: r.instagram, whatsapp: r.whatsapp, manifesto: r.manifesto, accentColor: r.accent_color });
+const settFromDB = r => {
+  let fontSizes = { heroYear:16, heroTheme:14, heroTitle:68, about:52, quote:18, footer:14 };
+  try {
+    const m = r.manifesto && r.manifesto.trim() ? JSON.parse(r.manifesto) : null;
+    if (m && m.fontSizes) fontSizes = m.fontSizes;
+  } catch (e) {}
+  return ({ clubName: r.club_name, city: r.city, email: r.email, instagram: r.instagram, whatsapp: r.whatsapp, manifesto: r.manifesto, fontSizes, accentColor: r.accent_color });
+};
 const settToDB   = s => {
-  // store extra texts inside the manifesto field as JSON to avoid DB schema changes
+  // store extra texts and font sizes inside the manifesto field as JSON to avoid DB schema changes
   let manifestoPayload = s.manifesto || '';
   try {
     const extra = s.extra || null;
     if (extra && typeof extra === 'object') {
-      manifestoPayload = JSON.stringify({ manifesto: s.manifesto || '', texts: extra });
+      manifestoPayload = JSON.stringify({ manifesto: s.manifesto || '', texts: extra, fontSizes: s.fontSizes || {} });
     }
   } catch (e) {
     manifestoPayload = s.manifesto || '';
@@ -55,7 +62,7 @@ const settToDB   = s => {
   return ({ club_name: s.clubName, city: s.city, email: s.email, instagram: s.instagram, whatsapp: s.whatsapp, manifesto: manifestoPayload, accent_color: s.accentColor });
 };
 
-const DEFAULT_SETTINGS = { clubName:'Club Parr', city:'Madrid, ES', email:'hola@clubparr.com', instagram:'@clubparr', whatsapp:'+34 600 000 000', manifesto:'Un oasis en el ruido.', extra: { heroYear:'EST. 2024 — MADRID', heroTheme:'Arte · Filosofía · Cultura', heroTitle:'UN OASIS EN EL RUIDO', about:'No es una academia...', quote:'Vivimos en una era de sobreabundancia de información y escasez de sentido.', footer:'' }, accentColor:'#3D7A28' };
+const DEFAULT_SETTINGS = { clubName:'Club Parr', city:'Madrid, ES', email:'hola@clubparr.com', instagram:'@clubparr', whatsapp:'+34 600 000 000', manifesto:'Un oasis en el ruido.', extra: { heroYear:'EST. 2024 — MADRID', heroTheme:'Arte · Filosofía · Cultura', heroTitle:'UN OASIS EN EL RUIDO', about:'No es una academia...', quote:'Vivimos en una era de sobreabundancia de información y escasez de sentido.', footer:'' }, fontSizes: { heroYear:16, heroTheme:14, heroTitle:68, about:52, quote:18, footer:14 }, accentColor:'#3D7A28' };
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -601,13 +608,19 @@ function Settings({ settings, reload, setToast }) {
           <Field label="WhatsApp"><Input value={form.whatsapp} onChange={f('whatsapp')}/></Field>
           <Field label="Manifiesto"><Textarea value={form.manifesto} onChange={f('manifesto')} rows={3}/></Field>
           <Field label="Año / Ubicación (Hero)"><Input value={form.extra.heroYear} onChange={e=>setForm({...form, extra:{...form.extra, heroYear: e.target.value}})} placeholder="EST. 2024 — MADRID"/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="8" max="32" value={form.fontSizes?.heroYear||16} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, heroYear:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.heroYear||16}px</span></div></Field>
           <Field label="Tema (Hero)"><Input value={form.extra.heroTheme} onChange={e=>setForm({...form, extra:{...form.extra, heroTheme: e.target.value}})} placeholder="Arte · Filosofía · Cultura"/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="8" max="32" value={form.fontSizes?.heroTheme||14} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, heroTheme:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.heroTheme||14}px</span></div></Field>
           <Field label="Título principal (Hero)"><Input value={form.extra.heroTitle} onChange={e=>setForm({...form, extra:{...form.extra, heroTitle: e.target.value}})} placeholder="UN OASIS EN EL RUIDO"/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="32" max="120" value={form.fontSizes?.heroTitle||68} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, heroTitle:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.heroTitle||68}px</span></div></Field>
           {errors.heroTitle && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginTop:-12, marginBottom:8 }}>{errors.heroTitle}</p>}
           <Field label="Texto sección 'Qué es Club Parr'"><Textarea value={form.extra.about} onChange={e=>setForm({...form, extra:{...form.extra, about: e.target.value}})} rows={3} placeholder="No es una academia..."/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="24" max="80" value={form.fontSizes?.about||52} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, about:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.about||52}px</span></div></Field>
           {errors.about && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginTop:-12, marginBottom:8 }}>{errors.about}</p>}
           <Field label="Frase / Cita destacada"><Textarea value={form.extra.quote} onChange={e=>setForm({...form, extra:{...form.extra, quote: e.target.value}})} rows={2} placeholder="Vivimos en una era de sobreabundancia..."/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="8" max="36" value={form.fontSizes?.quote||18} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, quote:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.quote||18}px</span></div></Field>
           <Field label="Texto pie de página (footer)"><Textarea value={form.extra.footer} onChange={e=>setForm({...form, extra:{...form.extra, footer: e.target.value}})} rows={2} placeholder="Club Parr — Madrid, ES"/></Field>
+          <Field label="Tamaño"><div style={{display:'flex', alignItems:'center', gap:10}}><input type="range" min="8" max="24" value={form.fontSizes?.footer||14} onChange={e=>setForm({...form, fontSizes:{...form.fontSizes, footer:Number(e.target.value)}})} style={{flex:1}}/><span style={{fontFamily:'Space Mono', fontSize:12, minWidth:40}}>{form.fontSizes?.footer||14}px</span></div></Field>
 
           <div style={{ marginTop:18, padding:14, background:'#0D0D0D', color:'#F5F0E8', borderRadius:6 }}>
             <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:14, marginBottom:8 }}>Vista previa</div>

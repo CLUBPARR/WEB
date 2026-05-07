@@ -3828,7 +3828,7 @@ setTimeout(() => {
       return;
     }
 
-    const updateElement = (el, text) => {
+    const updateElement = (el, text, fontSize) => {
       if (!text) return;
       const childDivs = Array.from(el.querySelectorAll(':scope > div'));
 
@@ -3837,6 +3837,7 @@ setTimeout(() => {
         const lines = text.split('\n');
         childDivs.forEach((div, i) => {
           div.textContent = lines[i] || '';
+          if (fontSize) div.style.fontSize = fontSize + 'px';
         });
       } else {
         // No child divs - replace with text and br tags
@@ -3848,6 +3849,7 @@ setTimeout(() => {
             el.appendChild(document.createElement('br'));
           }
         });
+        if (fontSize) el.style.fontSize = fontSize + 'px';
       }
     };
 
@@ -3868,15 +3870,17 @@ setTimeout(() => {
         }
 
         const allTexts = {};
+        const fontSizes = {};
         if (m && m.texts) Object.assign(allTexts, m.texts);
         if (m && m.manifesto) allTexts.manifesto = m.manifesto;
+        if (m && m.fontSizes) Object.assign(fontSizes, m.fontSizes);
 
         let updated = 0;
         Object.entries(allTexts).forEach(([key, val]) => {
           if (val) {
             const els = document.querySelectorAll(`[data-cp="${key}"]`);
             els.forEach(el => {
-              updateElement(el, val);
+              updateElement(el, val, fontSizes[key]);
               updated++;
             });
           }
