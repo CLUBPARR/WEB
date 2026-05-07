@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Club Parr — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,900&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--black:#0D0D0D;--cream:#F5F0E8;--green:#3D7A28;--green2:#2A5C1E;--border:rgba(13,13,13,0.1);}
+  body{background:var(--cream);color:var(--black);font-family:'Playfair Display',serif;min-height:100vh}
+  ::selection{background:var(--green);color:#fff}
+  button{cursor:pointer;border:none;background:none;font-family:'Barlow Condensed',sans-serif}
+  input,select,textarea{font-family:'Playfair Display',serif;outline:none}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--green)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes shake{0%,100%{transform:none}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @keyframes slideUp{from{opacity:0;transform:translate(-50%,-46%)}to{opacity:1;transform:translate(-50%,-50%)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── SUPABASE ─────────────────────────────────────────────────────────────────
+const SB_URL = 'https://yeyuqwaqitaysyyidiwa.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlleXVxd2FxaXRheXN5eWlkaXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNDcyMzMsImV4cCI6MjA4NzYyMzIzM30.0D3VBaL6JKxHYxec_FdNEvZvG7AWSTKDUGzBd42H-wU';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+// ─── ADAPTERS ─────────────────────────────────────────────────────────────────
+const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, img: r.img||null });
+const evToDB    = e => ({ date: e.date, month: e.month, day: e.day||'SAB', time: e.time, title: e.title, sub: e.sub, descripcion: e.desc, spots: Number(e.spots), total: Number(e.total), price: Number(e.price), tag: e.tag, active: !!e.active, img: e.img||null });
+const prodFromDB = r => ({ id: r.id, name: r.name, price: r.price, type: r.type, desc: r.descripcion||'', bg: r.bg, imgs: r.imgs||[], sizes: r.sizes||['XS','S','M','L','XL','XXL'], active: r.active });
+const prodToDB   = p => ({ name: p.name, price: Number(p.price), type: p.type, descripcion: p.desc, bg: p.bg, imgs: p.imgs||[], sizes: p.sizes||[], active: !!p.active });
+const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null });
+const galToDB    = g => ({ label: g.label, date: g.date, img: g.img||null });
+const settFromDB = r => ({ clubName: r.club_name, city: r.city, email: r.email, instagram: r.instagram, whatsapp: r.whatsapp, manifesto: r.manifesto, accentColor: r.accent_color });
+const settToDB   = s => ({ club_name: s.clubName, city: s.city, email: s.email, instagram: s.instagram, whatsapp: s.whatsapp, manifesto: s.manifesto, accent_color: s.accentColor });
+
+const DEFAULT_SETTINGS = { clubName:'Club Parr', city:'Madrid, ES', email:'hola@clubparr.com', instagram:'@clubparr', whatsapp:'+34 600 000 000', manifesto:'Un oasis en el ruido.', accentColor:'#3D7A28' };
+
+// ─── SHARED UI ────────────────────────────────────────────────────────────────
+function Spinner() {
+  return <div style={{ width:20, height:20, border:'2px solid rgba(13,13,13,0.1)', borderTop:'2px solid #3D7A28', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>;
+}
+function PageHeader({ title, subtitle, action }) {
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:32, paddingBottom:24, borderBottom:'1px solid var(--border)' }}>
+      <div>
+        <h1 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:48, lineHeight:0.9, textTransform:'uppercase' }}>{title}</h1>
+        {subtitle && <p style={{ fontFamily:'Space Mono', fontSize:10, opacity:0.4, marginTop:8, letterSpacing:'0.1em' }}>{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+function Btn({ children, onClick, variant='primary', small, disabled, loading }) {
+  const styles = { primary:{background:'#3D7A28',color:'#fff',border:'none'}, secondary:{background:'transparent',color:'#0D0D0D',border:'1px solid rgba(13,13,13,0.25)'}, danger:{background:'transparent',color:'#C0392B',border:'1px solid #C0392B'} };
+  return (
+    <button onClick={onClick} disabled={disabled||loading} style={{ padding:small?'6px 14px':'10px 20px', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:small?11:13, letterSpacing:'0.15em', textTransform:'uppercase', cursor:'pointer', opacity:(disabled||loading)?0.5:1, display:'flex', alignItems:'center', gap:8, transition:'opacity 0.2s', ...styles[variant] }}
+      onMouseEnter={e => !disabled&&!loading&&(e.currentTarget.style.opacity='0.8')}
+      onMouseLeave={e => e.currentTarget.style.opacity='1'}
+    >{loading && <Spinner/>}{children}</button>
+  );
+}
+function Field({ label, children }) {
+  return <div style={{ marginBottom:20 }}><label style={{ fontFamily:'Space Mono', fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', opacity:0.45, display:'block', marginBottom:6 }}>{label}</label>{children}</div>;
+}
+function Input({ value, onChange, type='text', placeholder, ...rest }) {
+  return <input type={type} value={value||''} onChange={onChange} placeholder={placeholder} style={{ width:'100%', padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:14, color:'#0D0D0D' }} onFocus={e=>e.target.style.border='1px solid #3D7A28'} onBlur={e=>e.target.style.border='1px solid rgba(13,13,13,0.15)'} {...rest}/>;
+}
+function Textarea({ value, onChange, rows=3, placeholder }) {
+  return <textarea value={value||''} onChange={onChange} rows={rows} placeholder={placeholder} style={{ width:'100%', padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:14, color:'#0D0D0D', resize:'vertical' }} onFocus={e=>e.target.style.border='1px solid #3D7A28'} onBlur={e=>e.target.style.border='1px solid rgba(13,13,13,0.15)'}/>;
+}
+function Toggle({ value, onChange, label }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+      <button onClick={()=>onChange(!value)} style={{ width:40, height:22, borderRadius:11, background:value?'#3D7A28':'rgba(13,13,13,0.15)', border:'none', cursor:'pointer', position:'relative', transition:'background 0.3s' }}>
+        <div style={{ position:'absolute', top:3, left:value?21:3, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left 0.3s' }}/>
+      </button>
+      {label && <span style={{ fontFamily:'Space Mono', fontSize:10, opacity:0.6 }}>{label}</span>}
+    </div>
+  );
+}
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2500); return ()=>clearTimeout(t); }, []);
+  return <div style={{ position:'fixed', bottom:24, right:24, background:'#0D0D0D', color:'#F5F0E8', padding:'12px 20px', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:13, letterSpacing:'0.1em', textTransform:'uppercase', zIndex:999, animation:'fadeIn 0.3s ease', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>✓ {msg}</div>;
+}
+
+// ─── IMAGE UPLOADER ───────────────────────────────────────────────────────────
+function MultiImageUploader({ value=[], onChange }) {
+  const ref = useRef();
+  const handleFile = e => {
+    const files = Array.from(e.target.files);
+    let pending = files.length;
+    const newImgs = [];
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => { newImgs.push(ev.target.result); if (--pending===0) onChange([...value,...newImgs]); };
+      reader.readAsDataURL(file);
+    });
+    e.target.value='';
+  };
+  return (
+    <Field label="Fotos">
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 }}>
+        {value.map((img,i) => (
+          <div key={i} style={{ position:'relative', width:80, height:80 }}>
+            <div style={{ width:80, height:80, backgroundImage:`url(${img})`, backgroundSize:'cover', backgroundPosition:'center', border:'1px solid rgba(13,13,13,0.1)' }}/>
+            <button onClick={()=>onChange(value.filter((_,j)=>j!==i))} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, background:'#C0392B', color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', border:'none', cursor:'pointer' }}>×</button>
+            {i===0 && <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(0,0,0,0.5)', fontFamily:'Space Mono', fontSize:7, color:'#fff', textAlign:'center', padding:'2px', letterSpacing:'0.05em' }}>PRINCIPAL</div>}
+          </div>
+        ))}
+        <div onClick={()=>ref.current.click()} style={{ width:80, height:80, border:'1px dashed rgba(13,13,13,0.2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'#F0EBE0', flexShrink:0 }}>
+          <span style={{ fontFamily:'Space Mono', fontSize:20, opacity:0.3 }}>+</span>
+        </div>
+      </div>
+      <input ref={ref} type="file" accept="image/*" multiple onChange={handleFile} style={{ display:'none' }}/>
+    </Field>
+  );
+}
+
+function SingleImageUploader({ value, onChange, label='Imagen', height=120 }) {
+  const ref = useRef();
+  const handleFile = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => onChange(ev.target.result);
+    reader.readAsDataURL(file); e.target.value='';
+  };
+  return (
+    <Field label={label}>
+      <div style={{ height, background:value?`url(${value}) center/cover`:'#E8E3D8', border:'1px dashed rgba(13,13,13,0.2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', position:'relative' }} onClick={()=>ref.current.click()}>
+        {!value && <span style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.4, letterSpacing:'0.1em' }}>CLICK PARA SUBIR</span>}
+        {value && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.3)', display:'flex', alignItems:'center', justifyContent:'center', opacity:0, transition:'opacity 0.2s' }} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0'}><span style={{ fontFamily:'Space Mono', fontSize:9, color:'#fff', letterSpacing:'0.1em' }}>CAMBIAR</span></div>}
+      </div>
+      {value && <button onClick={()=>onChange(null)} style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.35, textDecoration:'underline', marginTop:4, cursor:'pointer' }}>Eliminar</button>}
+      <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display:'none' }}/>
+    </Field>
+  );
+}
+
+// ─── LOGIN ─────────────────────────────────────────────────────────────────────
+function Login({ onLogin }) {
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState(false);
+  const [shake, setShake] = useState(false);
+  const handleSubmit = e => {
+    e.preventDefault();
+    const stored = localStorage.getItem('cp_admin_pass')||'clubparr';
+    if (pass===stored) { onLogin(); }
+    else { setErr(true); setShake(true); setTimeout(()=>setShake(false),500); }
+  };
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0D0D0D' }}>
+      <div style={{ width:380, animation:shake?'shake 0.4s ease':'none' }}>
+        <div style={{ animation:'fadeIn 0.6s ease', display:'flex', flexDirection:'column', alignItems:'center' }}>
+          <div style={{ width:72, height:72, marginBottom:32, background:'#3D7A28', WebkitMaskImage:"url('uploads/logo-Photoroom.png')", WebkitMaskSize:'contain', WebkitMaskRepeat:'no-repeat', WebkitMaskPosition:'center', maskImage:"url('uploads/logo-Photoroom.png')", maskSize:'contain', maskRepeat:'no-repeat', maskPosition:'center' }}/>
+          <h1 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:32, color:'#F5F0E8', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Panel Admin</h1>
+          <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#F5F0E8', opacity:0.35, letterSpacing:'0.1em', marginBottom:40 }}>CLUB PARR — MADRID</p>
+          <form onSubmit={handleSubmit} style={{ width:'100%' }}>
+            <input type="password" placeholder="Contraseña" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:16, letterSpacing:'0.15em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }} autoFocus/>
+            {err && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginBottom:12 }}>Contraseña incorrecta</p>}
+            <button type="submit" style={{ width:'100%', padding:'16px', background:'#3D7A28', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, letterSpacing:'0.2em', textTransform:'uppercase', border:'none', cursor:'pointer' }}>Entrar →</button>
+          </form>
+          <p style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.2, marginTop:20, textAlign:'center', lineHeight:1.7 }}>Contraseña por defecto: clubparr<br/>Cámbiala en Ajustes</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+function Sidebar({ active, setActive, onLogout, counts }) {
+  const items = [
+    { id:'dashboard', icon:'◈', label:'Dashboard' },
+    { id:'events', icon:'◉', label:'Eventos', count:counts.events },
+    { id:'products', icon:'◫', label:'Tienda', count:counts.products },
+    { id:'gallery', icon:'◧', label:'Galería', count:counts.gallery },
+    { id:'reservations', icon:'◎', label:'Reservas', count:counts.reservations },
+    { id:'settings', icon:'⊙', label:'Ajustes' },
+  ];
+  return (
+    <aside style={{ width:220, background:'#0D0D0D', minHeight:'100vh', position:'fixed', left:0, top:0, bottom:0, display:'flex', flexDirection:'column', padding:'32px 0' }}>
+      <div style={{ padding:'0 24px 32px', borderBottom:'1px solid rgba(245,240,232,0.08)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:32, height:32, background:'#3D7A28', flexShrink:0, WebkitMaskImage:"url('uploads/logo-Photoroom.png')", WebkitMaskSize:'contain', WebkitMaskRepeat:'no-repeat', WebkitMaskPosition:'center', maskImage:"url('uploads/logo-Photoroom.png')", maskSize:'contain', maskRepeat:'no-repeat', maskPosition:'center' }}/>
+          <div>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:16, color:'#F5F0E8', letterSpacing:'0.1em', textTransform:'uppercase' }}>Club Parr</div>
+            <div style={{ fontFamily:'Space Mono', fontSize:8, color:'#F5F0E8', opacity:0.3, letterSpacing:'0.1em' }}>ADMIN · SUPABASE</div>
+          </div>
+        </div>
+      </div>
+      <nav style={{ flex:1, padding:'16px 0' }}>
+        {items.map(item => (
+          <button key={item.id} onClick={()=>setActive(item.id)} style={{ width:'100%', padding:'12px 24px', display:'flex', alignItems:'center', gap:12, textAlign:'left', background:active===item.id?'rgba(61,122,40,0.15)':'transparent', borderLeft:`3px solid ${active===item.id?'#3D7A28':'transparent'}`, color:active===item.id?'#F5F0E8':'rgba(245,240,232,0.45)', transition:'all 0.2s' }}>
+            <span style={{ fontFamily:'Space Mono', fontSize:12, width:16 }}>{item.icon}</span>
+            <span style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, letterSpacing:'0.1em', textTransform:'uppercase', flex:1 }}>{item.label}</span>
+            {item.count !== undefined && <span style={{ fontFamily:'Space Mono', fontSize:9, background:active===item.id?'#3D7A28':'rgba(245,240,232,0.1)', color:'#F5F0E8', padding:'2px 6px', borderRadius:2 }}>{item.count}</span>}
+          </button>
+        ))}
+      </nav>
+      <div style={{ padding:'16px 24px', borderTop:'1px solid rgba(245,240,232,0.08)' }}>
+        <a href="Club Parr v2.html" target="_blank" style={{ display:'block', padding:'10px 16px', border:'1px solid rgba(245,240,232,0.15)', color:'rgba(245,240,232,0.5)', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:12, letterSpacing:'0.15em', textTransform:'uppercase', textAlign:'center', textDecoration:'none', marginBottom:8, transition:'all 0.2s' }} onMouseEnter={e=>e.currentTarget.style.color='#F5F0E8'} onMouseLeave={e=>e.currentTarget.style.color='rgba(245,240,232,0.5)'}>Ver sitio →</a>
+        <button onClick={onLogout} style={{ width:'100%', padding:'8px', color:'rgba(245,240,232,0.3)', fontFamily:'Space Mono', fontSize:9, letterSpacing:'0.1em', textTransform:'uppercase', transition:'color 0.2s' }} onMouseEnter={e=>e.currentTarget.style.color='#C0392B'} onMouseLeave={e=>e.currentTarget.style.color='rgba(245,240,232,0.3)'}>Cerrar sesión</button>
+      </div>
+    </aside>
+  );
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function Dashboard({ events, products, gallery, reservations, setSection }) {
+  const stats = [
+    { n:events.filter(e=>e.active).length, l:'Eventos activos', s:'events', color:'#3D7A28' },
+    { n:products.filter(p=>p.active).length, l:'Productos en venta', s:'products', color:'#0D0D0D' },
+    { n:gallery.length, l:'Fotos galería', s:'gallery', color:'#8B7355' },
+    { n:reservations.length, l:'Reservas recibidas', s:'reservations', color:'#2C2C2C' },
+  ];
+  return (
+    <div>
+      <PageHeader title="Dashboard" subtitle={`Conectado a Supabase · ${new Date().toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`}/>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:40 }}>
+        {stats.map((s,i)=>(
+          <div key={i} onClick={()=>s.s&&setSection(s.s)} style={{ background:s.color, padding:'28px 24px', cursor:s.s?'pointer':'default', transition:'opacity 0.2s' }} onMouseEnter={e=>s.s&&(e.currentTarget.style.opacity='0.85')} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:52, color:'#fff', lineHeight:1 }}>{s.n}</div>
+            <div style={{ fontFamily:'Space Mono', fontSize:9, color:'#fff', opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', marginTop:4 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      {events.filter(e=>e.active).length>0 && (() => { const ev=events.filter(e=>e.active)[0]; return (
+        <div style={{ background:'#fff', padding:'24px', border:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <div>
+            <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.35, letterSpacing:'0.1em', marginBottom:6, textTransform:'uppercase' }}>Próximo evento</div>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:28, marginBottom:4 }}>{ev.title}</div>
+            <div style={{ fontFamily:'Space Mono', fontSize:10, opacity:0.5 }}>{ev.date} {ev.month} · {ev.time} · €{ev.price} · {ev.spots} lugares libres</div>
+          </div>
+          <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:48, opacity:0.12 }}>{ev.date}</div>
+        </div>
+      ); })()}
+      {reservations.length>0 && (
+        <div style={{ background:'#fff', padding:'20px 24px', border:'1px solid var(--border)' }}>
+          <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.35, letterSpacing:'0.1em', marginBottom:12, textTransform:'uppercase' }}>Últimas reservas</div>
+          {reservations.slice(0,3).map(r=>(
+            <div key={r.id} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(13,13,13,0.06)' }}>
+              <span style={{ fontFamily:'Playfair Display', fontSize:14 }}>{r.name}</span>
+              <span style={{ fontFamily:'Space Mono', fontSize:10, opacity:0.5 }}>{r.event_title}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────────
+const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const TAGS = ['FIL.','LIT.','ART.','MUS.','CIN.','GAS.','OTR.'];
+const emptyEvent = () => ({ date:'01', month:'MAY', day:'SAB', time:'19:00', title:'', sub:'', desc:'', spots:15, total:20, price:10, tag:'ART.', active:true, img:null });
+
+function EventsManager({ events, reload, toast, setToast }) {
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const saveEvent = async (ev) => {
+    setSaving(true);
+    if (ev.id) { await sb.from('events').update(evToDB(ev)).eq('id', ev.id); }
+    else { await sb.from('events').insert(evToDB(ev)); }
+    await reload();
+    setSaving(false); setEditing(null); setToast('Evento guardado');
+  };
+  const deleteEvent = async (id) => {
+    if (!confirm('¿Eliminar este evento?')) return;
+    await sb.from('events').delete().eq('id', id);
+    await reload(); setToast('Evento eliminado');
+  };
+  const toggleActive = async (ev) => {
+    await sb.from('events').update({ active: !ev.active }).eq('id', ev.id);
+    await reload();
+  };
+
+  return (
+    <div>
+      <PageHeader title="Eventos" subtitle={`${events.filter(e=>e.active).length} activos · ${events.length} total`} action={<Btn onClick={()=>setEditing(emptyEvent())}>+ Nuevo evento</Btn>}/>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {events.map(ev=>(
+          <div key={ev.id} style={{ background:'#fff', border:'1px solid var(--border)', padding:'20px 24px', display:'flex', alignItems:'center', gap:24, opacity:ev.active?1:0.5 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:36, color:'#3D7A28', lineHeight:1, minWidth:60 }}>{ev.date}<br/><span style={{ fontSize:12, color:'#0D0D0D', opacity:0.5 }}>{ev.month}</span></div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:20 }}>{ev.title||'(sin título)'}</div>
+              <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.4, marginTop:2 }}>{ev.sub} · {ev.time} · €{ev.price} · {ev.spots}/{ev.total} lugares · {ev.tag}</div>
+            </div>
+            <Toggle value={ev.active} onChange={()=>toggleActive(ev)} label="Visible"/>
+            <div style={{ display:'flex', gap:8 }}>
+              <Btn onClick={()=>setEditing({...ev})} variant="secondary" small>Editar</Btn>
+              <Btn onClick={()=>deleteEvent(ev.id)} variant="danger" small>×</Btn>
+            </div>
+          </div>
+        ))}
+        {events.length===0 && <div style={{ textAlign:'center', padding:'48px', opacity:0.3, fontFamily:'Playfair Display', fontStyle:'italic' }}>No hay eventos. Crea el primero.</div>}
+      </div>
+      {editing && <EventModal ev={editing} onSave={saveEvent} onClose={()=>setEditing(null)} saving={saving}/>}
+    </div>
+  );
+}
+
+function EventModal({ ev, onSave, onClose, saving }) {
+  const [form, setForm] = useState({...ev});
+  const f = k => e => setForm({...form, [k]:e.target.value});
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:100, backdropFilter:'blur(2px)' }}/>
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:640, maxHeight:'90vh', overflowY:'auto', background:'#F5F0E8', zIndex:101, padding:'40px', borderTop:'4px solid #3D7A28', animation:'slideUp 0.3s ease' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:28 }}>
+          <h2 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:28, textTransform:'uppercase' }}>{ev.id?'Editar evento':'Nuevo evento'}</h2>
+          <button onClick={onClose} style={{ fontSize:22, opacity:0.3 }}>×</button>
+        </div>
+        <SingleImageUploader value={form.img} onChange={v=>setForm({...form,img:v})} label="Imagen del evento" height={120}/>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+          <Field label="Día"><Input value={form.date} onChange={f('date')} placeholder="15"/></Field>
+          <Field label="Mes"><select value={form.month} onChange={f('month')} style={{ width:'100%', padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:14, color:'#0D0D0D' }}>{MONTHS.map(m=><option key={m}>{m}</option>)}</select></Field>
+          <Field label="Hora"><Input value={form.time} onChange={f('time')} placeholder="19:00"/></Field>
+          <Field label="Categoría"><select value={form.tag} onChange={f('tag')} style={{ width:'100%', padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:14 }}>{TAGS.map(t=><option key={t}>{t}</option>)}</select></Field>
+        </div>
+        <Field label="Título"><Input value={form.title} onChange={f('title')} placeholder="Nietzsche y el Arte"/></Field>
+        <Field label="Subtítulo"><Input value={form.sub} onChange={f('sub')} placeholder="Velada Filosófica"/></Field>
+        <Field label="Descripción"><Textarea value={form.desc} onChange={f('desc')} placeholder="Describe la sesión..."/></Field>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16, marginBottom:16 }}>
+          <Field label="Precio (€)"><Input type="number" value={form.price} onChange={f('price')}/></Field>
+          <Field label="Lugares totales"><Input type="number" value={form.total} onChange={f('total')}/></Field>
+          <Field label="Lugares libres"><Input type="number" value={form.spots} onChange={f('spots')}/></Field>
+        </div>
+        <Toggle value={!!form.active} onChange={v=>setForm({...form,active:v})} label="Visible en el sitio"/>
+        <div style={{ display:'flex', gap:10, marginTop:28 }}>
+          <Btn onClick={()=>onSave(form)} loading={saving}>Guardar evento</Btn>
+          <Btn onClick={onClose} variant="secondary">Cancelar</Btn>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
+const emptyProduct = () => ({ name:'', price:0, type:'Ropa', desc:'', bg:'#1A1A1A', imgs:[], sizes:['XS','S','M','L','XL','XXL'], active:true });
+
+function ProductsManager({ products, reload, setToast }) {
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const saveProduct = async (p) => {
+    setSaving(true);
+    if (p.id) { await sb.from('products').update(prodToDB(p)).eq('id', p.id); }
+    else { await sb.from('products').insert(prodToDB(p)); }
+    await reload(); setSaving(false); setEditing(null); setToast('Producto guardado');
+  };
+  const deleteProduct = async (id) => {
+    if (!confirm('¿Eliminar?')) return;
+    await sb.from('products').delete().eq('id', id);
+    await reload(); setToast('Eliminado');
+  };
+  const toggleActive = async (p) => {
+    await sb.from('products').update({ active: !p.active }).eq('id', p.id);
+    await reload();
+  };
+
+  return (
+    <div>
+      <PageHeader title="Tienda" subtitle={`${products.filter(p=>p.active).length} activos`} action={<Btn onClick={()=>setEditing(emptyProduct())}>+ Nuevo producto</Btn>}/>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+        {products.map(p=>(
+          <div key={p.id} style={{ background:'#fff', border:'1px solid var(--border)', overflow:'hidden', opacity:p.active?1:0.5 }}>
+            <div style={{ height:100, background:p.imgs&&p.imgs[0]?`url(${p.imgs[0]}) center/cover`:p.bg, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+              {(!p.imgs||!p.imgs[0]) && <span style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:13, color:'rgba(255,255,255,0.4)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{p.type}</span>}
+              <div style={{ position:'absolute', top:8, right:8 }}><Toggle value={p.active} onChange={()=>toggleActive(p)} label=""/></div>
+            </div>
+            <div style={{ padding:'16px' }}>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:18, marginBottom:2 }}>{p.name||'(sin nombre)'}</div>
+              <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:24, color:'#3D7A28', marginBottom:12 }}>€{p.price}</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <Btn onClick={()=>setEditing({...p})} variant="secondary" small>Editar</Btn>
+                <Btn onClick={()=>deleteProduct(p.id)} variant="danger" small>×</Btn>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {editing && <ProductModal p={editing} onSave={saveProduct} onClose={()=>setEditing(null)} saving={saving}/>}
+    </div>
+  );
+}
+
+function ProductModal({ p, onSave, onClose, saving }) {
+  const [form, setForm] = useState({...p, imgs: p.imgs||[], sizes: p.sizes||['XS','S','M','L','XL','XXL']});
+  const f = k => e => setForm({...form,[k]:e.target.value});
+  const allSizes = ['XS','S','M','L','XL','XXL'];
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:100, backdropFilter:'blur(2px)' }}/>
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:560, maxHeight:'90vh', overflowY:'auto', background:'#F5F0E8', zIndex:101, padding:'40px', borderTop:'4px solid #3D7A28', animation:'slideUp 0.3s ease' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:28 }}>
+          <h2 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:28, textTransform:'uppercase' }}>Producto</h2>
+          <button onClick={onClose} style={{ fontSize:22, opacity:0.3 }}>×</button>
+        </div>
+        <MultiImageUploader value={form.imgs} onChange={v=>setForm({...form,imgs:v})}/>
+        <Field label="Nombre"><Input value={form.name} onChange={f('name')} placeholder="Camiseta Club Parr"/></Field>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+          <Field label="Precio (€)"><Input type="number" value={form.price} onChange={f('price')}/></Field>
+          <Field label="Categoría"><select value={form.type} onChange={f('type')} style={{ width:'100%', padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:14 }}><option>Ropa</option><option>Cerámica</option><option>Accesorios</option></select></Field>
+        </div>
+        <Field label="Descripción"><Textarea value={form.desc} onChange={f('desc')} rows={2} placeholder="Describe el producto..."/></Field>
+        <Field label="Color fondo (sin foto)">
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <input type="color" value={form.bg} onChange={f('bg')} style={{ width:44, height:36, border:'none', cursor:'pointer' }}/>
+            <div style={{ width:44, height:36, background:form.bg, border:'1px solid rgba(13,13,13,0.1)' }}/>
+          </div>
+        </Field>
+        {form.type==='Ropa' && (
+          <Field label="Tallas disponibles">
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {allSizes.map(s => {
+                const sel = (form.sizes||[]).includes(s);
+                return <button key={s} onClick={()=>setForm({...form,sizes:sel?form.sizes.filter(x=>x!==s):[...(form.sizes||[]),s]})} style={{ padding:'6px 14px', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:13, background:sel?'#3D7A28':'transparent', color:sel?'#fff':'#0D0D0D', border:`1px solid ${sel?'#3D7A28':'rgba(13,13,13,0.2)'}`, cursor:'pointer', transition:'all 0.2s' }}>{s}</button>;
+              })}
+            </div>
+          </Field>
+        )}
+        <Toggle value={!!form.active} onChange={v=>setForm({...form,active:v})} label="Visible en tienda"/>
+        <div style={{ display:'flex', gap:10, marginTop:28 }}>
+          <Btn onClick={()=>onSave(form)} loading={saving}>Guardar</Btn>
+          <Btn onClick={onClose} variant="secondary">Cancelar</Btn>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── GALLERY ──────────────────────────────────────────────────────────────────
+function GalleryManager({ gallery, reload, setToast }) {
+  const fileRef = useRef();
+  const [newLabel, setNewLabel] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = e => {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const item = { label: newLabel||file.name.replace(/\.[^.]+$/,''), date: newDate||new Date().toLocaleDateString('es-ES',{month:'short',year:'numeric'}).toUpperCase(), img: ev.target.result };
+      await sb.from('gallery').insert(galToDB(item));
+      await reload(); setNewLabel(''); setNewDate(''); setUploading(false); setToast('Foto añadida');
+    };
+    reader.readAsDataURL(file); e.target.value='';
+  };
+  const deleteItem = async id => {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    await sb.from('gallery').delete().eq('id', id);
+    await reload(); setToast('Foto eliminada');
+  };
+  const updateItem = async (id, key, val) => {
+    await sb.from('gallery').update({ [key]: val }).eq('id', id);
+  };
+
+  return (
+    <div>
+      <PageHeader title="Galería" subtitle={`${gallery.length} fotos`}/>
+      <div style={{ background:'#fff', border:'2px dashed rgba(13,13,13,0.15)', padding:'32px', marginBottom:32, textAlign:'center' }}>
+        <div style={{ marginBottom:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, maxWidth:400, margin:'0 auto 16px' }}>
+          <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} placeholder="Título de la sesión" style={{ padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:13, fontFamily:'Playfair Display', outline:'none' }}/>
+          <input value={newDate} onChange={e=>setNewDate(e.target.value)} placeholder="Fecha: MAR 2025" style={{ padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:13, fontFamily:'Playfair Display', outline:'none' }}/>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display:'none' }}/>
+        <Btn onClick={()=>fileRef.current.click()} loading={uploading}>+ Subir foto</Btn>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+        {gallery.map(item=>(
+          <div key={item.id} style={{ background:'#fff', border:'1px solid var(--border)', overflow:'hidden' }}>
+            <div style={{ height:160, background:item.img?`url(${item.img}) center/cover`:'#1C1814', position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {!item.img && <span style={{ fontFamily:'Space Mono', fontSize:9, color:'rgba(245,240,232,0.3)' }}>Sin imagen</span>}
+              <button onClick={()=>deleteItem(item.id)} style={{ position:'absolute', top:8, right:8, width:24, height:24, background:'rgba(192,57,43,0.8)', color:'#fff', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center', border:'none', cursor:'pointer' }}>×</button>
+            </div>
+            <div style={{ padding:'12px' }}>
+              <input defaultValue={item.label} onBlur={e=>updateItem(item.id,'label',e.target.value)} style={{ width:'100%', border:'none', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:15, color:'#0D0D0D', background:'transparent', marginBottom:4, outline:'none' }}/>
+              <input defaultValue={item.date} onBlur={e=>updateItem(item.id,'date',e.target.value)} style={{ width:'100%', border:'none', fontFamily:'Space Mono', fontSize:9, color:'#0D0D0D', opacity:0.4, background:'transparent', outline:'none', letterSpacing:'0.1em' }}/>
+            </div>
+          </div>
+        ))}
+      </div>
+      {gallery.length===0 && <div style={{ textAlign:'center', padding:'48px', opacity:0.3, fontFamily:'Playfair Display', fontStyle:'italic' }}>Sube tu primera foto.</div>}
+    </div>
+  );
+}
+
+// ─── RESERVATIONS ─────────────────────────────────────────────────────────────
+function ReservationsManager({ reservations, reload, setToast }) {
+  const deleteRes = async id => {
+    if (!confirm('¿Eliminar reserva?')) return;
+    await sb.from('reservations').delete().eq('id', id);
+    await reload(); setToast('Reserva eliminada');
+  };
+  return (
+    <div>
+      <PageHeader title="Reservas" subtitle={`${reservations.length} reservas recibidas`}/>
+      {reservations.length===0 ? (
+        <div style={{ textAlign:'center', padding:'48px', opacity:0.3, fontFamily:'Playfair Display', fontStyle:'italic' }}>No hay reservas aún.</div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:1, background:'rgba(13,13,13,0.06)' }}>
+          {reservations.map(r=>(
+            <div key={r.id} style={{ background:'#fff', padding:'16px 24px', display:'flex', alignItems:'center', gap:24 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:'Playfair Display', fontWeight:700, fontSize:16 }}>{r.name}</div>
+                <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.45, marginTop:2 }}>{r.email} {r.phone&&'· '+r.phone}</div>
+                {r.note && <div style={{ fontFamily:'Playfair Display', fontSize:13, opacity:0.5, marginTop:4, fontStyle:'italic' }}>"{r.note}"</div>}
+              </div>
+              <div style={{ textAlign:'right' }}>
+                <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, color:'#3D7A28' }}>{r.event_title}</div>
+                <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.35, marginTop:2 }}>{new Date(r.created_at).toLocaleDateString('es-ES')}</div>
+              </div>
+              <Btn onClick={()=>deleteRes(r.id)} variant="danger" small>×</Btn>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+function Settings({ settings, reload, setToast }) {
+  const [form, setForm] = useState({...settings});
+  const [passForm, setPassForm] = useState({ current:'', new1:'', new2:'' });
+  const [passErr, setPassErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const f = k => e => setForm({...form,[k]:e.target.value});
+
+  const saveSettings = async () => {
+    setSaving(true);
+    await sb.from('settings').update(settToDB(form)).eq('id', 1);
+    await reload(); setSaving(false); setToast('Ajustes guardados');
+  };
+  const changePass = () => {
+    const stored = localStorage.getItem('cp_admin_pass')||'clubparr';
+    if (passForm.current!==stored) { setPassErr('Contraseña actual incorrecta'); return; }
+    if (passForm.new1.length<4) { setPassErr('Mínimo 4 caracteres'); return; }
+    if (passForm.new1!==passForm.new2) { setPassErr('No coinciden'); return; }
+    localStorage.setItem('cp_admin_pass', passForm.new1);
+    setPassForm({current:'',new1:'',new2:''}); setPassErr(''); setToast('Contraseña cambiada');
+  };
+
+  return (
+    <div>
+      <PageHeader title="Ajustes"/>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+        <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)' }}>
+          <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Información</div>
+          <Field label="Nombre del club"><Input value={form.clubName} onChange={f('clubName')}/></Field>
+          <Field label="Ciudad"><Input value={form.city} onChange={f('city')}/></Field>
+          <Field label="Email"><Input value={form.email} onChange={f('email')} type="email"/></Field>
+          <Field label="Instagram"><Input value={form.instagram} onChange={f('instagram')}/></Field>
+          <Field label="WhatsApp"><Input value={form.whatsapp} onChange={f('whatsapp')}/></Field>
+          <Field label="Manifiesto"><Textarea value={form.manifesto} onChange={f('manifesto')} rows={3}/></Field>
+          <Field label="Color acento">
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <input type="color" value={form.accentColor} onChange={f('accentColor')} style={{ width:44, height:36, border:'none', cursor:'pointer' }}/>
+              <div style={{ width:44, height:36, background:form.accentColor }}/>
+            </div>
+          </Field>
+          <Btn onClick={saveSettings} loading={saving}>Guardar ajustes</Btn>
+        </div>
+        <div>
+          <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Cambiar contraseña</div>
+            <Field label="Actual"><Input type="password" value={passForm.current} onChange={e=>setPassForm({...passForm,current:e.target.value})}/></Field>
+            <Field label="Nueva"><Input type="password" value={passForm.new1} onChange={e=>setPassForm({...passForm,new1:e.target.value})}/></Field>
+            <Field label="Repetir"><Input type="password" value={passForm.new2} onChange={e=>setPassForm({...passForm,new2:e.target.value})}/></Field>
+            {passErr && <p style={{ fontFamily:'Space Mono', fontSize:9, color:'#C0392B', marginBottom:12 }}>{passErr}</p>}
+            <Btn onClick={changePass}>Cambiar contraseña</Btn>
+          </div>
+          <div style={{ background:'#0D0D0D', padding:'28px' }}>
+            <div style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.4, letterSpacing:'0.1em', marginBottom:8 }}>BASE DE DATOS</div>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, color:'#3D7A28', marginBottom:4 }}>✓ Conectado a Supabase</div>
+            <div style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.3, lineHeight:1.7 }}>yeyuqwaqitaysyyidiwa<br/>West EU (Ireland)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [auth, setAuth] = useState(()=>sessionStorage.getItem('cp_auth')==='1');
+  const [section, setSection] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [gallery, setGallery] = useState([]);
+  const [reservations, setReservations] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [toast, setToast] = useState('');
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const [ev, pr, ga, re, se] = await Promise.all([
+      sb.from('events').select('*').order('created_at'),
+      sb.from('products').select('*').order('created_at'),
+      sb.from('gallery').select('*').order('created_at'),
+      sb.from('reservations').select('*').order('created_at', { ascending: false }),
+      sb.from('settings').select('*').eq('id', 1).single(),
+    ]);
+    setEvents((ev.data||[]).map(evFromDB));
+    setProducts((pr.data||[]).map(prodFromDB));
+    setGallery((ga.data||[]).map(galFromDB));
+    setReservations(re.data||[]);
+    if (se.data) setSettings(settFromDB(se.data));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (auth) loadAll(); }, [auth]);
+
+  const login = () => { sessionStorage.setItem('cp_auth','1'); setAuth(true); };
+  const logout = () => { sessionStorage.removeItem('cp_auth'); setAuth(false); };
+
+  if (!auth) return <Login onLogin={login}/>;
+
+  const sections = {
+    dashboard: <Dashboard events={events} products={products} gallery={gallery} reservations={reservations} setSection={setSection}/>,
+    events: <EventsManager events={events} reload={loadAll} toast={toast} setToast={setToast}/>,
+    products: <ProductsManager products={products} reload={loadAll} setToast={setToast}/>,
+    gallery: <GalleryManager gallery={gallery} reload={loadAll} setToast={setToast}/>,
+    reservations: <ReservationsManager reservations={reservations} reload={loadAll} setToast={setToast}/>,
+    settings: <Settings settings={settings} reload={loadAll} setToast={setToast}/>,
+  };
+
+  return (
+    <div style={{ display:'flex', minHeight:'100vh' }}>
+      <Sidebar active={section} setActive={setSection} onLogout={logout} counts={{ events:events.length, products:products.length, gallery:gallery.length, reservations:reservations.length }}/>
+      <main style={{ marginLeft:220, flex:1, padding:'40px 48px', minHeight:'100vh', background:'#F5F0E8' }}>
+        {loading ? (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:16 }}>
+            <Spinner/>
+            <p style={{ fontFamily:'Space Mono', fontSize:10, opacity:0.4, letterSpacing:'0.1em' }}>CARGANDO DESDE SUPABASE...</p>
+          </div>
+        ) : sections[section]}
+      </main>
+      {toast && <Toast msg={toast} onDone={()=>setToast('')}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
