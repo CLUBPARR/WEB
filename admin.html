@@ -43,7 +43,24 @@ const galToDB    = g => ({ label: g.label, date: g.date, img: g.img||null });
 const settFromDB = r => ({ clubName: r.club_name, city: r.city, email: r.email, instagram: r.instagram, whatsapp: r.whatsapp, manifesto: r.manifesto, accentColor: r.accent_color });
 const settToDB   = s => ({ club_name: s.clubName, city: s.city, email: s.email, instagram: s.instagram, whatsapp: s.whatsapp, manifesto: s.manifesto, accent_color: s.accentColor });
 
-const DEFAULT_SETTINGS = { clubName:'Club Parr', city:'Madrid, ES', email:'hola@clubparr.com', instagram:'@clubparr', whatsapp:'+34 600 000 000', manifesto:'Un oasis en el ruido.', accentColor:'#3D7A28' };
+const DEFAULT_SETTINGS = { clubName:'Club Parr', city:'Madrid, ES', email:'clubparr@gmail.com', instagram:'@_clubparr', whatsapp:'', manifesto:'', accentColor:'#2D5016' };
+
+const TEXT_DEFAULTS = {
+  footer: 'Que una tarde\nen Club Parr\nse sienta\ndiferente.',
+  heroMeta: 'EST. 2024 — MADRID',
+  heroTheme: 'Arte · Filosofía · Cultura',
+  heroTitle: 'CREAMOS\nEXPERIENCIAS\nHAND MADE.',
+  heroSubtitle: 'donde el arte es excusa para pausar, conectar y disfrutar juntos.',
+  manifestoTitle: 'La palabra\nque nos define\nes **HANDMADE.**',
+  manifestoP1: 'Hacerlo nosotros mismos como **postura filosófica y estética**, frente a la uniformidad digital.',
+  manifestoP2: 'La huella humana frente al consumo rápido.',
+};
+
+function parseTexts(raw) {
+  if (!raw) return { ...TEXT_DEFAULTS };
+  try { const p = JSON.parse(raw); if (p && typeof p === 'object') { const t = p.texts || p; return { ...TEXT_DEFAULTS, ...t }; } } catch {}
+  return { ...TEXT_DEFAULTS, footer: raw };
+}
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -533,14 +550,17 @@ function ReservationsManager({ reservations, reload, setToast }) {
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
 function Settings({ settings, reload, setToast }) {
   const [form, setForm] = useState({...settings});
+  const [texts, setTexts] = useState(() => parseTexts(settings.manifesto));
   const [passForm, setPassForm] = useState({ current:'', new1:'', new2:'' });
   const [passErr, setPassErr] = useState('');
   const [saving, setSaving] = useState(false);
   const f = k => e => setForm({...form,[k]:e.target.value});
+  const ft = k => e => setTexts({...texts,[k]:e.target.value});
 
   const saveSettings = async () => {
     setSaving(true);
-    await sb.from('settings').update(settToDB(form)).eq('id', 1);
+    const payload = { ...form, manifesto: JSON.stringify(texts) };
+    await sb.from('settings').update(settToDB(payload)).eq('id', 1);
     await reload(); setSaving(false); setToast('Ajustes guardados');
   };
   const changePass = () => {
@@ -554,25 +574,42 @@ function Settings({ settings, reload, setToast }) {
 
   return (
     <div>
-      <PageHeader title="Ajustes"/>
+      <PageHeader title="Ajustes" subtitle="Tip: rodea una palabra con **dobles asteriscos** para que aparezca en color acento"/>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
-        <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)' }}>
-          <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Información</div>
-          <Field label="Nombre del club"><Input value={form.clubName} onChange={f('clubName')}/></Field>
-          <Field label="Ciudad"><Input value={form.city} onChange={f('city')}/></Field>
-          <Field label="Email"><Input value={form.email} onChange={f('email')} type="email"/></Field>
-          <Field label="Instagram"><Input value={form.instagram} onChange={f('instagram')}/></Field>
-          <Field label="WhatsApp"><Input value={form.whatsapp} onChange={f('whatsapp')}/></Field>
-          <Field label="Manifiesto"><Textarea value={form.manifesto} onChange={f('manifesto')} rows={3}/></Field>
-          <Field label="Color acento">
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <input type="color" value={form.accentColor} onChange={f('accentColor')} style={{ width:44, height:36, border:'none', cursor:'pointer' }}/>
-              <div style={{ width:44, height:36, background:form.accentColor }}/>
-            </div>
-          </Field>
+        <div>
+          <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Información</div>
+            <Field label="Nombre del club"><Input value={form.clubName} onChange={f('clubName')}/></Field>
+            <Field label="Ciudad"><Input value={form.city} onChange={f('city')}/></Field>
+            <Field label="Email"><Input value={form.email} onChange={f('email')} type="email"/></Field>
+            <Field label="Instagram (sin la url, con @ o sin él)"><Input value={form.instagram} onChange={f('instagram')}/></Field>
+            <Field label="Color acento">
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <input type="color" value={form.accentColor} onChange={f('accentColor')} style={{ width:44, height:36, border:'none', cursor:'pointer' }}/>
+                <div style={{ width:44, height:36, background:form.accentColor }}/>
+              </div>
+            </Field>
+          </div>
+          <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)' }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Hero (cabecera)</div>
+            <Field label="Texto pequeño (esquina sup. izq.)"><Input value={texts.heroMeta} onChange={ft('heroMeta')} placeholder="EST. 2024 — MADRID"/></Field>
+            <Field label="Texto vertical (lado derecho)"><Input value={texts.heroTheme} onChange={ft('heroTheme')} placeholder="Arte · Filosofía · Cultura"/></Field>
+            <Field label="Título grande (una línea por enter — la última se pinta en acento)"><Textarea value={texts.heroTitle} onChange={ft('heroTitle')} rows={3}/></Field>
+            <Field label="Subtítulo"><Textarea value={texts.heroSubtitle} onChange={ft('heroSubtitle')} rows={2}/></Field>
+          </div>
           <Btn onClick={saveSettings} loading={saving}>Guardar ajustes</Btn>
         </div>
         <div>
+          <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Manifiesto (sección 01)</div>
+            <Field label="Título grande (línea por enter, **palabra** = acento)"><Textarea value={texts.manifestoTitle} onChange={ft('manifestoTitle')} rows={3}/></Field>
+            <Field label="Párrafo 1"><Textarea value={texts.manifestoP1} onChange={ft('manifestoP1')} rows={3}/></Field>
+            <Field label="Párrafo 2"><Textarea value={texts.manifestoP2} onChange={ft('manifestoP2')} rows={2}/></Field>
+          </div>
+          <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)', marginBottom:16 }}>
+            <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Footer (frase grande)</div>
+            <Field label="Frase (una línea por enter)"><Textarea value={texts.footer} onChange={ft('footer')} rows={4}/></Field>
+          </div>
           <div style={{ background:'#fff', padding:'28px', border:'1px solid var(--border)', marginBottom:16 }}>
             <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:18, textTransform:'uppercase', marginBottom:20, letterSpacing:'0.1em' }}>Cambiar contraseña</div>
             <Field label="Actual"><Input type="password" value={passForm.current} onChange={e=>setPassForm({...passForm,current:e.target.value})}/></Field>

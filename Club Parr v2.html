@@ -183,6 +183,43 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY);
 const MONTH_FULL = { ENE: 'Enero', FEB: 'Febrero', MAR: 'Marzo', ABR: 'Abril', MAY: 'Mayo', JUN: 'Junio', JUL: 'Julio', AGO: 'Agosto', SEP: 'Septiembre', OCT: 'Octubre', NOV: 'Noviembre', DIC: 'Diciembre' };
 const fullMonth = m => MONTH_FULL[(m || '').toUpperCase()] || m;
 
+// ─── EDITABLE SITE TEXTS ──────────────────────────────────────────────────────
+const SITE_TEXT_DEFAULTS = {
+  footer: 'Que una tarde\nen Club Parr\nse sienta\ndiferente.',
+  heroMeta: 'EST. 2024 — MADRID',
+  heroTheme: 'Arte · Filosofía · Cultura',
+  heroTitle: 'CREAMOS\nEXPERIENCIAS\nHAND MADE.',
+  heroSubtitle: 'donde el arte es excusa para pausar, conectar y disfrutar juntos.',
+  manifestoTitle: 'La palabra\nque nos define\nes **HANDMADE.**',
+  manifestoP1: 'Hacerlo nosotros mismos como postura filosófica y estética, frente a la uniformidad digital.',
+  manifestoP2: 'La huella humana frente al consumo rápido.',
+};
+
+function parseTexts(raw) {
+  if (!raw) return { ...SITE_TEXT_DEFAULTS };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      const texts = parsed.texts || parsed;
+      return { ...SITE_TEXT_DEFAULTS, ...texts };
+    }
+  } catch {}
+  return { ...SITE_TEXT_DEFAULTS, footer: raw };
+}
+
+function renderRich(text, accentColor) {
+  if (!text) return null;
+  const lines = String(text).split('\n');
+  return lines.flatMap((line, i) => {
+    const parts = line.split(/\*\*(.+?)\*\*/g).map((p, j) =>
+      j % 2 === 1
+        ? <span key={`s${i}-${j}`} style={{ color: accentColor }}>{p}</span>
+        : p
+    );
+    return i < lines.length - 1 ? [...parts, <br key={`br${i}`}/>] : parts;
+  });
+}
+
 // ─── DATOS DEL ADMIN (localStorage) ──────────────────────────────────────────
 function loadData(key, def) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; } }
 
@@ -294,13 +331,15 @@ function Ticker({ tweaks }) {
 }
 
 // ─── HERO ─────────────────────────────────────────────────────────────────────
-function Hero({ tweaks }) {
+function Hero({ tweaks, texts }) {
   const [stamped, setStamped] = useState(false);
   const [vis, setVis] = useState(false);
   useEffect(() => {
     setTimeout(() => setVis(true), 100);
     setTimeout(() => setStamped(true), 400);
   }, []);
+  const t = texts || SITE_TEXT_DEFAULTS;
+  const heroLines = (t.heroTitle || '').split('\n');
   return (
     <section id="hero" style={{ marginLeft: 64, minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', position: 'relative' }}>
       {/* LEFT: Type */}
@@ -319,30 +358,30 @@ function Hero({ tweaks }) {
           position: 'absolute', top: 32, left: 48,
           fontFamily: 'Space Mono', fontSize: 10, letterSpacing: '0.2em', opacity: 0.35,
           animation: vis ? 'fadeUp 0.8s ease 0.1s both' : 'none',
-        }}>EST. 2024 — MADRID</div>
+        }}>{t.heroMeta}</div>
         {/* Vertical label */}
         <div style={{
           position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
           writingMode: 'vertical-rl', textOrientation: 'mixed',
           fontFamily: 'Playfair Display', fontSize: 11, letterSpacing: '0.3em', opacity: 0.25,
-        }}>Arte · Filosofía · Cultura</div>
+        }}>{t.heroTheme}</div>
         {/* Big type */}
         <div style={{ position: 'relative', zIndex: 2 }}>
-          {["CREAMOS", "EXPERIENCIAS", "HAND MADE."].map((line, i) => (
+          {heroLines.map((line, i) => (
             <div key={i} style={{
               fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal',
               fontSize: 'clamp(42px, 5.8vw, 80px)', lineHeight: 0.95,
               letterSpacing: '-0.02em', textTransform: 'uppercase',
-              color: i === 2 ? tweaks.accentColor : '#0D0D0D',
+              color: i === heroLines.length - 1 ? tweaks.accentColor : '#0D0D0D',
               animation: vis ? `fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) ${0.15 + i * 0.08}s both` : 'none',
-            }}>{line}</div>
+            }}>{renderRich(line, tweaks.accentColor)}</div>
           ))}
           <p style={{
             fontFamily: 'Playfair Display', fontSize: 17, lineHeight: 1.6,
             color: '#0D0D0D', opacity: 0.7, marginTop: 24, maxWidth: 480,
             fontStyle: 'italic', fontWeight: 400,
             animation: vis ? 'fadeUp 0.7s ease 0.55s both' : 'none',
-          }}>donde el arte es excusa para pausar, conectar y disfrutar juntos.</p>
+          }}>{t.heroSubtitle}</p>
           <div style={{ marginTop: 36, display: 'flex', gap: 16, animation: vis ? 'fadeUp 0.7s ease 0.6s both' : 'none' }}>
             <a href="#eventos" style={{
               display: 'inline-block', padding: '12px 24px',
@@ -390,8 +429,9 @@ function Hero({ tweaks }) {
 // ─── TICKER 2 ─────────────────────────────────────────────────────────────────
 
 // ─── CLUB ─────────────────────────────────────────────────────────────────────
-function ClubSection({ tweaks }) {
+function ClubSection({ tweaks, texts }) {
   useReveal();
+  const t = texts || SITE_TEXT_DEFAULTS;
   return (
     <section id="club" style={{ marginLeft: 64, background: tweaks.paperColor }}>
       <Ticker tweaks={tweaks} />
@@ -403,13 +443,13 @@ function ClubSection({ tweaks }) {
         {/* Text */}
         <div className="reveal" style={{ padding: '80px 48px', borderRight: '1px solid rgba(13,13,13,0.08)' }}>
           <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 'clamp(46px, 5.4vw, 74px)', lineHeight: 0.98, textTransform: 'uppercase', marginBottom: 40 }}>
-            La palabra<br/>que nos define<br/>es <span style={{ color: tweaks.accentColor }}>HANDMADE.</span>
+            {renderRich(t.manifestoTitle, tweaks.accentColor)}
           </div>
           <p style={{ fontFamily: 'Playfair Display', fontSize: 17, lineHeight: 2, opacity: 0.75, marginBottom: 20, fontWeight: 400 }}>
-            Hacerlo nosotros mismos como <strong>postura filosófica y estética</strong>, frente a la uniformidad digital.
+            {renderRich(t.manifestoP1, tweaks.accentColor)}
           </p>
           <p style={{ fontFamily: 'Playfair Display', fontSize: 15, lineHeight: 2, opacity: 0.55 }}>
-            La huella humana frente al consumo rápido.
+            {renderRich(t.manifestoP2, tweaks.accentColor)}
           </p>
         </div>
         {/* Stats */}
@@ -875,14 +915,15 @@ function ReservationModal({ event, onClose, tweaks, onConfirm }) {
 }
 
 // ─── FOOTER ───────────────────────────────────────────────────────────────────
-function Footer({ tweaks, settings }) {
+function Footer({ tweaks, settings, texts }) {
   useReveal();
+  const t = texts || SITE_TEXT_DEFAULTS;
   const email = settings?.email || 'clubparr@gmail.com';
   const igHandle = settings?.instagram || '@_clubparr';
   const igUrl = igHandle.startsWith('http') ? igHandle : 'https://instagram.com/' + igHandle.replace(/^@/, '');
   const clubName = settings?.club_name || 'Club Parr';
   const city = settings?.city || 'Madrid, ES';
-  const phraseLines = (settings?.manifesto || 'Que una tarde\nen Club Parr\nse sienta\ndiferente.').split('\n');
+  const phraseLines = (t.footer || '').split('\n');
   const contacts = [
     { label: email, href: 'mailto:' + email, ext: false },
     { label: igHandle, href: igUrl, ext: true },
@@ -1060,12 +1101,12 @@ function App() {
   return (
     <div style={{ background: tweaks.paperColor, minHeight: '100vh' }}>
       <SideNav cartCount={cartCount} onCartOpen={() => setCartOpen(true)} tweaks={tweaks} />
-      <Hero tweaks={tweaks} />
-      <ClubSection tweaks={tweaks} />
+      <Hero tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
+      <ClubSection tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
       <EventsSection tweaks={tweaks} events={liveEvents} onReserve={setReserveEvent} />
       {/* <GallerySection tweaks={tweaks} items={liveGallery} /> — oculta hasta tener sesiones reales que mostrar */}
       <ShopSection tweaks={tweaks} products={liveProducts} onAdd={addToCart} onOpenProduct={setProductDetail} />
-      <Footer tweaks={tweaks} settings={sbSettings} />
+      <Footer tweaks={tweaks} settings={sbSettings} texts={parseTexts(sbSettings?.manifesto)} />
       {cartOpen && <CartDrawer cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={updateQty} tweaks={tweaks} />}
       {productDetail && <ProductDetailModal p={productDetail} tweaks={tweaks} onAdd={addToCart} onClose={() => setProductDetail(null)} />}
       {reserveEvent && <ReservationModal event={reserveEvent} onClose={() => setReserveEvent(null)} tweaks={tweaks} onConfirm={handleReserve} />}
