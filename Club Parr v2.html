@@ -1000,16 +1000,35 @@ function App() {
   const updateQty = (id, qty) => { if (qty < 1) { removeFromCart(id); return; } setCart(prev => prev.map(i => i.id===id ? {...i,qty} : i)); };
   const cartCount = cart.reduce((s,i) => s + i.qty, 0);
 
-  // Save reservation to Supabase
+  // Save reservation to Supabase + notify club by email
   const handleReserve = async (eventObj, formData) => {
-    await sb.from('reservations').insert({
-      event_id: eventObj.id || null,
-      event_title: eventObj.title,
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone || null,
-      note: formData.note || null,
-    });
+    try {
+      await sb.from('reservations').insert({
+        event_id: eventObj.id || null,
+        event_title: eventObj.title,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || null,
+        note: formData.note || null,
+      });
+      await fetch('https://formsubmit.co/ajax/clubparr@gmail.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          _subject: `Nueva reserva — ${eventObj.title}`,
+          _replyto: formData.email,
+          _captcha: 'false',
+          nombre: formData.name,
+          email: formData.email,
+          telefono: formData.phone || '—',
+          evento: eventObj.title,
+          fecha: `${eventObj.date} ${eventObj.month}`,
+          nota: formData.note || '—',
+        }),
+      });
+    } catch (e) {
+      console.error('Error en reservación:', e);
+    }
   };
 
   return (
