@@ -848,11 +848,13 @@ function ReservationModal({ event, onClose, tweaks, onConfirm }) {
               </div>
             ))}
           </div>
-          <button onClick={submit} style={{
+          <button onClick={submit} disabled={submitting} style={{
             width: '100%', padding: '16px', background: tweaks.accentColor, color: '#fff',
             fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 14, letterSpacing: '0.2em',
-            textTransform: 'uppercase', border: 'none', cursor: 'pointer',
-          }}>Confirmar reserva →</button>
+            textTransform: 'uppercase', border: 'none',
+            cursor: submitting ? 'wait' : 'pointer',
+            opacity: submitting ? 0.55 : 1,
+          }}>{submitting ? 'Reservando...' : 'Confirmar reserva →'}</button>
         </> : (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 900, fontSize: 80, color: tweaks.accentColor, lineHeight: 1, marginBottom: 16 }}>✓</div>
@@ -1016,7 +1018,7 @@ function App() {
     }
     // Fire-and-forget email — never blocks user confirmation
     const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 4000);
+    setTimeout(() => ctrl.abort(), 10000);
     fetch('https://formsubmit.co/ajax/clubparr@gmail.com', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
