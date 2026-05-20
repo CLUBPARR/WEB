@@ -875,8 +875,18 @@ function ReservationModal({ event, onClose, tweaks, onConfirm }) {
 }
 
 // ─── FOOTER ───────────────────────────────────────────────────────────────────
-function Footer({ tweaks }) {
+function Footer({ tweaks, settings }) {
   useReveal();
+  const email = settings?.email || 'clubparr@gmail.com';
+  const igHandle = settings?.instagram || '@_clubparr';
+  const igUrl = igHandle.startsWith('http') ? igHandle : 'https://instagram.com/' + igHandle.replace(/^@/, '');
+  const clubName = settings?.club_name || 'Club Parr';
+  const city = settings?.city || 'Madrid, ES';
+  const phraseLines = (settings?.manifesto || 'Que una tarde\nen Club Parr\nse sienta\ndiferente.').split('\n');
+  const contacts = [
+    { label: email, href: 'mailto:' + email, ext: false },
+    { label: igHandle, href: igUrl, ext: true },
+  ];
   return (
     <footer id="contacto" style={{ marginLeft: 64, background: tweaks.accentColor }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0 }}>
@@ -884,17 +894,16 @@ function Footer({ tweaks }) {
         <div className="reveal" style={{ padding: '64px 48px', borderRight: '1px solid rgba(255,255,255,0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 320 }}>
           <div className="logo-white" style={{ width: 100, height: 100 }}/>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 36, color: '#fff', lineHeight: 1.05, textTransform: 'uppercase' }}>Que una tarde<br/>en Club Parr<br/>se sienta<br/>diferente.</div>
+            <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 36, color: '#fff', lineHeight: 1.05, textTransform: 'uppercase' }}>
+              {phraseLines.map((ln, i) => <React.Fragment key={i}>{ln}{i < phraseLines.length - 1 && <br/>}</React.Fragment>)}
+            </div>
           </div>
         </div>
         {/* Contact */}
         <div className="reveal reveal-m" style={{ padding: '64px 48px', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
           <div style={{ fontFamily: 'Space Mono', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#fff', opacity: 0.5, marginBottom: 24 }}>Contacto</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {[
-              { label: 'clubparr@gmail.com', href: 'mailto:clubparr@gmail.com', ext: false },
-              { label: '@_clubparr', href: 'https://instagram.com/_clubparr', ext: true },
-            ].map(c => (
+            {contacts.map(c => (
               <a key={c.label} href={c.href} target={c.ext ? '_blank' : undefined} rel={c.ext ? 'noopener noreferrer' : undefined}
                 style={{ fontFamily: 'Playfair Display', fontWeight: 500, fontSize: 15, color: '#fff', opacity: 0.8, transition: 'opacity 0.2s', display: 'block' }}
                 onMouseEnter={e => e.target.style.opacity = '1'}
@@ -902,7 +911,7 @@ function Footer({ tweaks }) {
               >{c.label}</a>
             ))}
           </div>
-          <div style={{ marginTop: 40, fontFamily: 'Playfair Display', fontSize: 18, color: '#fff', opacity: 0.4, writingMode: 'horizontal-tb', lineHeight: 2 }}>Club Parr — Madrid, ES</div>
+          <div style={{ marginTop: 40, fontFamily: 'Playfair Display', fontSize: 18, color: '#fff', opacity: 0.4, writingMode: 'horizontal-tb', lineHeight: 2 }}>{clubName} — {city}</div>
         </div>
         {/* Newsletter */}
         <div className="reveal reveal-h" style={{ padding: '64px 48px' }}>
@@ -972,6 +981,7 @@ function App() {
   const [sbEvents, setSbEvents] = useState(null);
   const [sbProducts, setSbProducts] = useState(null);
   const [sbGallery, setSbGallery] = useState(null);
+  const [sbSettings, setSbSettings] = useState(null);
 
   useEffect(() => {
     // Load from Supabase
@@ -979,12 +989,19 @@ function App() {
       sb.from('events').select('*').eq('active', true).order('created_at'),
       sb.from('products').select('*').eq('active', true).order('created_at'),
       sb.from('gallery').select('*').order('created_at'),
-    ]).then(([ev, pr, ga]) => {
+      sb.from('settings').select('*').eq('id', 1).single(),
+    ]).then(([ev, pr, ga, se]) => {
       if (ev.data && ev.data.length > 0) setSbEvents(ev.data.map(evFromDB));
       if (pr.data && pr.data.length > 0) setSbProducts(pr.data.map(prodFromDB));
       if (ga.data && ga.data.length > 0) setSbGallery(ga.data.map(galFromDB));
+      if (se.data) setSbSettings(se.data);
     });
   }, []);
+
+  // Apply accent color from settings (if set)
+  useEffect(() => {
+    if (sbSettings?.accent_color) setTweaks(prev => ({ ...prev, accentColor: sbSettings.accent_color }));
+  }, [sbSettings]);
 
   // Use Supabase data if available, fallback to static defaults
   const liveEvents   = sbEvents   || EVENTS;
@@ -1048,7 +1065,7 @@ function App() {
       <EventsSection tweaks={tweaks} events={liveEvents} onReserve={setReserveEvent} />
       {/* <GallerySection tweaks={tweaks} items={liveGallery} /> — oculta hasta tener sesiones reales que mostrar */}
       <ShopSection tweaks={tweaks} products={liveProducts} onAdd={addToCart} onOpenProduct={setProductDetail} />
-      <Footer tweaks={tweaks} />
+      <Footer tweaks={tweaks} settings={sbSettings} />
       {cartOpen && <CartDrawer cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={updateQty} tweaks={tweaks} />}
       {productDetail && <ProductDetailModal p={productDetail} tweaks={tweaks} onAdd={addToCart} onClose={() => setProductDetail(null)} />}
       {reserveEvent && <ReservationModal event={reserveEvent} onClose={() => setReserveEvent(null)} tweaks={tweaks} onConfirm={handleReserve} />}
