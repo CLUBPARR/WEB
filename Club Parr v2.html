@@ -1016,17 +1016,18 @@ function App() {
     } catch (e) {
       console.error('Supabase insert error:', e);
     }
-    // Fire-and-forget email — never blocks user confirmation
+    // Fire-and-forget email notification (Web3Forms) — never blocks confirmation
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 10000);
-    fetch('https://formsubmit.co/ajax/clubparr@gmail.com', {
+    fetch('https://api.web3forms.com/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       signal: ctrl.signal,
       body: JSON.stringify({
-        _subject: `Nueva reserva — ${eventObj.title}`,
-        _replyto: formData.email,
-        _captcha: 'false',
+        access_key: '02dddd1c-c92b-4a16-a7d4-390af03ca35e',
+        subject: `Nueva reserva — ${eventObj.title}`,
+        from_name: 'Club Parr · Reservas',
+        replyto: formData.email,
         nombre: formData.name,
         email: formData.email,
         telefono: formData.phone || '—',
