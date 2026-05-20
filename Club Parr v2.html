@@ -180,6 +180,9 @@ const SB_URL = 'https://yeyuqwaqitaysyyidiwa.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlleXVxd2FxaXRheXN5eWlkaXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNDcyMzMsImV4cCI6MjA4NzYyMzIzM30.0D3VBaL6JKxHYxec_FdNEvZvG7AWSTKDUGzBd42H-wU';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
+const MONTH_FULL = { ENE: 'Enero', FEB: 'Febrero', MAR: 'Marzo', ABR: 'Abril', MAY: 'Mayo', JUN: 'Junio', JUL: 'Julio', AGO: 'Agosto', SEP: 'Septiembre', OCT: 'Octubre', NOV: 'Noviembre', DIC: 'Diciembre' };
+const fullMonth = m => MONTH_FULL[(m || '').toUpperCase()] || m;
+
 // ─── DATOS DEL ADMIN (localStorage) ──────────────────────────────────────────
 function loadData(key, def) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; } }
 
@@ -224,7 +227,7 @@ function useReveal() {
 // ─── SIDEBAR NAV ─────────────────────────────────────────────────────────────
 function SideNav({ cartCount, onCartOpen, tweaks }) {
   const [active, setActive] = useState('');
-  const sections = ['club','eventos','galeria','tienda','contacto'];
+  const sections = ['club','eventos','tienda','contacto'];
   useEffect(() => {
     const fn = () => {
       const scrollY = window.scrollY + 200;
@@ -325,15 +328,21 @@ function Hero({ tweaks }) {
         }}>Arte · Filosofía · Cultura</div>
         {/* Big type */}
         <div style={{ position: 'relative', zIndex: 2 }}>
-          {["UN", "OASIS", "EN EL", "RUIDO."].map((line, i) => (
+          {["CREAMOS", "EXPERIENCIAS", "HAND MADE."].map((line, i) => (
             <div key={i} style={{
               fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal',
-              fontSize: 'clamp(68px, 9vw, 118px)', lineHeight: 0.88,
+              fontSize: 'clamp(56px, 7.5vw, 100px)', lineHeight: 0.92,
               letterSpacing: '-0.02em', textTransform: 'uppercase',
-              color: i === 3 ? tweaks.accentColor : '#0D0D0D',
+              color: i === 2 ? tweaks.accentColor : '#0D0D0D',
               animation: vis ? `fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) ${0.15 + i * 0.08}s both` : 'none',
             }}>{line}</div>
           ))}
+          <p style={{
+            fontFamily: 'Playfair Display', fontSize: 17, lineHeight: 1.6,
+            color: '#0D0D0D', opacity: 0.7, marginTop: 24, maxWidth: 480,
+            fontStyle: 'italic', fontWeight: 400,
+            animation: vis ? 'fadeUp 0.7s ease 0.55s both' : 'none',
+          }}>donde el arte es excusa para pausar, conectar y disfrutar juntos.</p>
           <div style={{ marginTop: 36, display: 'flex', gap: 16, animation: vis ? 'fadeUp 0.7s ease 0.6s both' : 'none' }}>
             <a href="#eventos" style={{
               display: 'inline-block', padding: '12px 24px',
@@ -393,14 +402,14 @@ function ClubSection({ tweaks }) {
         </div>
         {/* Text */}
         <div className="reveal" style={{ padding: '80px 48px', borderRight: '1px solid rgba(13,13,13,0.08)' }}>
-          <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 'clamp(52px, 6vw, 80px)', lineHeight: 0.9, textTransform: 'uppercase', marginBottom: 40 }}>
-            No es<br/>una<br/>academia.
+          <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 'clamp(46px, 5.4vw, 74px)', lineHeight: 0.98, textTransform: 'uppercase', marginBottom: 40 }}>
+            La palabra<br/>que nos define<br/>es <span style={{ color: tweaks.accentColor }}>HANDMADE.</span>
           </div>
           <p style={{ fontFamily: 'Playfair Display', fontSize: 17, lineHeight: 2, opacity: 0.75, marginBottom: 20, fontWeight: 400 }}>
-            No es un bar cultural. No es un evento de networking. Es un <strong>oasis</strong> — un espacio donde la conexión humana es genuina y el arte es el hilo conductor de todo.
+            Hacerlo nosotros mismos como <strong>postura filosófica y estética</strong>, frente a la uniformidad digital.
           </p>
           <p style={{ fontFamily: 'Playfair Display', fontSize: 15, lineHeight: 2, opacity: 0.55 }}>
-            Nos reunimos periódicamente alrededor de una temática artística, filosófica o espiritual. Cada sesión es irrepetible.
+            La huella humana frente al consumo rápido.
           </p>
         </div>
         {/* Stats */}
@@ -578,7 +587,7 @@ function ShopSection({ tweaks, onAdd, onOpenProduct, products: prodProp }) {
     <section id="tienda" style={{ marginLeft: 64, background: '#0D0D0D' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr' }}>
         <div style={{ borderRight: '1px solid rgba(245,240,232,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
-          <div style={{ writingMode: 'vertical-rl', fontFamily: 'Space Mono', fontSize: 10, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#F5F0E8', opacity: 0.3 }}>04 / Tienda</div>
+          <div style={{ writingMode: 'vertical-rl', fontFamily: 'Space Mono', fontSize: 10, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#F5F0E8', opacity: 0.3 }}>03 / Tienda</div>
         </div>
         <div style={{ padding: '80px 48px' }}>
           <div className="reveal" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
@@ -849,7 +858,7 @@ function ReservationModal({ event, onClose, tweaks, onConfirm }) {
             <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 900, fontSize: 80, color: tweaks.accentColor, lineHeight: 1, marginBottom: 16 }}>✓</div>
             <h3 style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 32, textTransform: 'uppercase', marginBottom: 12 }}>¡Reservado!</h3>
             <p style={{ fontFamily: 'Playfair Display', fontSize: 15, opacity: 0.65, lineHeight: 1.8, marginBottom: 24 }}>
-              Hola <strong>{form.name}</strong> — te vemos en<br/><strong>{event.title}</strong> el {event.date} {event.month}.
+              HOLA <strong>{form.name}</strong>..... Nos vemos en la experiencia:<br/><strong>{event.title}</strong>, el {event.date} de {fullMonth(event.month)}.
             </p>
             <button onClick={onClose} style={{
               padding: '10px 28px', background: 'transparent', color: '#0D0D0D',
@@ -873,7 +882,7 @@ function Footer({ tweaks }) {
         <div className="reveal" style={{ padding: '64px 48px', borderRight: '1px solid rgba(255,255,255,0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 320 }}>
           <div className="logo-white" style={{ width: 100, height: 100 }}/>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 48, color: '#fff', lineHeight: 0.9, textTransform: 'uppercase' }}>Un oasis<br/>en el<br/>ruido.</div>
+            <div style={{ fontFamily: 'Cormorant Garamond', fontWeight: 600, fontStyle: 'normal', fontSize: 36, color: '#fff', lineHeight: 1.05, textTransform: 'uppercase' }}>Que una tarde<br/>en Club Parr<br/>se sienta<br/>diferente.</div>
           </div>
         </div>
         {/* Contact */}
@@ -1009,7 +1018,7 @@ function App() {
       <Hero tweaks={tweaks} />
       <ClubSection tweaks={tweaks} />
       <EventsSection tweaks={tweaks} events={liveEvents} onReserve={setReserveEvent} />
-      <GallerySection tweaks={tweaks} items={liveGallery} />
+      {/* <GallerySection tweaks={tweaks} items={liveGallery} /> — oculta hasta tener sesiones reales que mostrar */}
       <ShopSection tweaks={tweaks} products={liveProducts} onAdd={addToCart} onOpenProduct={setProductDetail} />
       <Footer tweaks={tweaks} />
       {cartOpen && <CartDrawer cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={updateQty} tweaks={tweaks} />}
