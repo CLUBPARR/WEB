@@ -1000,7 +1000,7 @@ function App() {
   const updateQty = (id, qty) => { if (qty < 1) { removeFromCart(id); return; } setCart(prev => prev.map(i => i.id===id ? {...i,qty} : i)); };
   const cartCount = cart.reduce((s,i) => s + i.qty, 0);
 
-  // Save reservation to Supabase + notify club by email
+  // Save reservation to Supabase (critical); fire email notification in background
   const handleReserve = async (eventObj, formData) => {
     try {
       await sb.from('reservations').insert({
@@ -1011,24 +1011,28 @@ function App() {
         phone: formData.phone || null,
         note: formData.note || null,
       });
-      await fetch('https://formsubmit.co/ajax/clubparr@gmail.com', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          _subject: `Nueva reserva — ${eventObj.title}`,
-          _replyto: formData.email,
-          _captcha: 'false',
-          nombre: formData.name,
-          email: formData.email,
-          telefono: formData.phone || '—',
-          evento: eventObj.title,
-          fecha: `${eventObj.date} ${eventObj.month}`,
-          nota: formData.note || '—',
-        }),
-      });
     } catch (e) {
-      console.error('Error en reservación:', e);
+      console.error('Supabase insert error:', e);
     }
+    // Fire-and-forget email — never blocks user confirmation
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 4000);
+    fetch('https://formsubmit.co/ajax/clubparr@gmail.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        _subject: `Nueva reserva — ${eventObj.title}`,
+        _replyto: formData.email,
+        _captcha: 'false',
+        nombre: formData.name,
+        email: formData.email,
+        telefono: formData.phone || '—',
+        evento: eventObj.title,
+        fecha: `${eventObj.date} ${eventObj.month}`,
+        nota: formData.note || '—',
+      }),
+    }).catch(e => console.warn('Email notify failed (reservation saved OK):', e));
   };
 
   return (
