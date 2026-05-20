@@ -1035,7 +1035,9 @@ function App() {
         fecha: `${eventObj.date} ${eventObj.month}`,
         nota: formData.note || '—',
       }),
-    }).catch(e => console.warn('Email notify failed (reservation saved OK):', e));
+    })
+      .then(r => r.json().then(j => console.log('Web3Forms response:', r.status, j)))
+      .catch(e => console.warn('Email notify failed (reservation saved OK):', e));
   };
 
   return (
