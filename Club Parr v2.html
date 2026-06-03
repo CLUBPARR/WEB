@@ -1052,7 +1052,7 @@ function App() {
   useEffect(() => {
     // Load from Supabase
     Promise.all([
-      sb.from('events').select('*').eq('active', true).order('created_at'),
+      sb.from('events').select('*').or('active.eq.true,finished.eq.true').order('created_at'),
       sb.from('products').select('*').eq('active', true).order('created_at'),
       sb.from('gallery').select('*').order('created_at'),
       sb.from('settings').select('*').eq('id', 1).single(),
@@ -1069,10 +1069,11 @@ function App() {
     if (sbSettings?.accent_color) setTweaks(prev => ({ ...prev, accentColor: sbSettings.accent_color }));
   }, [sbSettings]);
 
-  // Use Supabase data if available, fallback to static defaults
-  const liveEvents   = sbEvents   || EVENTS;
-  const liveProducts = sbProducts || PRODUCTS;
-  const liveGallery  = sbGallery  || GALLERY_ITEMS;
+  // Usa SIEMPRE los datos de Supabase. Si una sección está vacía, se muestra
+  // vacía (ya no usamos los datos de ejemplo de relleno).
+  const liveEvents   = sbEvents   || [];
+  const liveProducts = sbProducts || [];
+  const liveGallery  = sbGallery  || [];
   // Próximos = no finalizados; los finalizados pasan a la galería como sesiones pasadas
   const upcomingEvents = liveEvents.filter(e => !e.finished);
   const pastEvents     = liveEvents.filter(e => e.finished);
