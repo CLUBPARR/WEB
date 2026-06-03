@@ -33,6 +33,18 @@ const SB_URL = 'https://yeyuqwaqitaysyyidiwa.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlleXVxd2FxaXRheXN5eWlkaXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNDcyMzMsImV4cCI6MjA4NzYyMzIzM30.0D3VBaL6JKxHYxec_FdNEvZvG7AWSTKDUGzBd42H-wU';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
+// ─── SUBIR IMAGEN A STORAGE ────────────────────────────────────────────────────
+// Sube el archivo al bucket "media" y devuelve la URL pública (un texto corto).
+// Antes guardábamos la foto entera como base64 en la BD: pesaba demasiado y fallaba.
+async function uploadToStorage(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from('media').upload(path, file, { cacheControl:'3600', contentType:file.type });
+  if (error) { alert('No se pudo subir la imagen: ' + error.message); throw error; }
+  const { data } = sb.storage.from('media').getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // ─── ADAPTERS ─────────────────────────────────────────────────────────────────
 const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, img: r.img||null });
 const evToDB    = e => ({ date: e.date, month: e.month, day: e.day||'SAB', time: e.time, title: e.title, sub: e.sub, descripcion: e.desc, spots: Number(e.spots), total: Number(e.total), price: Number(e.price), tag: e.tag, active: !!e.active, img: e.img||null });
@@ -113,19 +125,19 @@ function Toast({ msg, onDone }) {
 // ─── IMAGE UPLOADER ───────────────────────────────────────────────────────────
 function MultiImageUploader({ value=[], onChange }) {
   const ref = useRef();
-  const handleFile = e => {
+  const [busy, setBusy] = useState(false);
+  const handleFile = async e => {
     const files = Array.from(e.target.files);
-    let pending = files.length;
-    const newImgs = [];
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => { newImgs.push(ev.target.result); if (--pending===0) onChange([...value,...newImgs]); };
-      reader.readAsDataURL(file);
-    });
     e.target.value='';
+    setBusy(true);
+    try {
+      const urls = [];
+      for (const file of files) urls.push(await uploadToStorage(file));
+      onChange([...value, ...urls]);
+    } finally { setBusy(false); }
   };
   return (
-    <Field label="Fotos">
+    <Field label={busy ? 'Fotos (subiendo…)' : 'Fotos'}>
       <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 }}>
         {value.map((img,i) => (
           <div key={i} style={{ position:'relative', width:80, height:80 }}>
@@ -145,14 +157,15 @@ function MultiImageUploader({ value=[], onChange }) {
 
 function SingleImageUploader({ value, onChange, label='Imagen', height=120 }) {
   const ref = useRef();
-  const handleFile = e => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => onChange(ev.target.result);
-    reader.readAsDataURL(file); e.target.value='';
+  const [busy, setBusy] = useState(false);
+  const handleFile = async e => {
+    const file = e.target.files[0]; e.target.value=''; if (!file) return;
+    setBusy(true);
+    try { onChange(await uploadToStorage(file)); }
+    finally { setBusy(false); }
   };
   return (
-    <Field label={label}>
+    <Field label={busy ? label + ' (subiendo…)' : label}>
       <div style={{ height, background:value?`url(${value}) center/cover`:'#E8E3D8', border:'1px dashed rgba(13,13,13,0.2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', position:'relative' }} onClick={()=>ref.current.click()}>
         {!value && <span style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.4, letterSpacing:'0.1em' }}>CLICK PARA SUBIR</span>}
         {value && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.3)', display:'flex', alignItems:'center', justifyContent:'center', opacity:0, transition:'opacity 0.2s' }} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0'}><span style={{ fontFamily:'Space Mono', fontSize:9, color:'#fff', letterSpacing:'0.1em' }}>CAMBIAR</span></div>}
@@ -164,15 +177,19 @@ function SingleImageUploader({ value, onChange, label='Imagen', height=120 }) {
 }
 
 // ─── LOGIN ─────────────────────────────────────────────────────────────────────
-function Login({ onLogin }) {
+function Login() {
+  const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [err, setErr] = useState(false);
   const [shake, setShake] = useState(false);
-  const handleSubmit = e => {
+  const [busy, setBusy] = useState(false);
+  const handleSubmit = async e => {
     e.preventDefault();
-    const stored = localStorage.getItem('cp_admin_pass')||'clubparr';
-    if (pass===stored) { onLogin(); }
-    else { setErr(true); setShake(true); setTimeout(()=>setShake(false),500); }
+    setBusy(true);
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    setBusy(false);
+    if (error) { setErr(true); setShake(true); setTimeout(()=>setShake(false),500); }
+    // Si el login es correcto, onAuthStateChange en App actualiza la sesión solo.
   };
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0D0D0D' }}>
@@ -182,11 +199,12 @@ function Login({ onLogin }) {
           <h1 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:32, color:'#F5F0E8', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Panel Admin</h1>
           <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#F5F0E8', opacity:0.35, letterSpacing:'0.1em', marginBottom:40 }}>CLUB PARR — MADRID</p>
           <form onSubmit={handleSubmit} style={{ width:'100%' }}>
-            <input type="password" placeholder="Contraseña" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:16, letterSpacing:'0.15em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }} autoFocus/>
-            {err && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginBottom:12 }}>Contraseña incorrecta</p>}
-            <button type="submit" style={{ width:'100%', padding:'16px', background:'#3D7A28', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, letterSpacing:'0.2em', textTransform:'uppercase', border:'none', cursor:'pointer' }}>Entrar →</button>
+            <input type="email" placeholder="Email" value={email} onChange={e=>{setEmail(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:14, letterSpacing:'0.05em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }} autoFocus/>
+            <input type="password" placeholder="Contraseña" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:16, letterSpacing:'0.15em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }}/>
+            {err && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginBottom:12 }}>Email o contraseña incorrectos</p>}
+            <button type="submit" disabled={busy} style={{ width:'100%', padding:'16px', background:'#3D7A28', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, letterSpacing:'0.2em', textTransform:'uppercase', border:'none', cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'Entrando…':'Entrar →'}</button>
           </form>
-          <p style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.2, marginTop:20, textAlign:'center', lineHeight:1.7 }}>Contraseña por defecto: clubparr<br/>Cámbiala en Ajustes</p>
+          <p style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.2, marginTop:20, textAlign:'center', lineHeight:1.7 }}>Acceso solo para usuarios autorizados</p>
         </div>
       </div>
     </div>
@@ -463,16 +481,15 @@ function GalleryManager({ gallery, reload, setToast }) {
   const [newDate, setNewDate] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  const handleUpload = e => {
-    const file = e.target.files[0]; if (!file) return;
+  const handleUpload = async e => {
+    const file = e.target.files[0]; e.target.value=''; if (!file) return;
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      const item = { label: newLabel||file.name.replace(/\.[^.]+$/,''), date: newDate||new Date().toLocaleDateString('es-ES',{month:'short',year:'numeric'}).toUpperCase(), img: ev.target.result };
+    try {
+      const url = await uploadToStorage(file);
+      const item = { label: newLabel||file.name.replace(/\.[^.]+$/,''), date: newDate||new Date().toLocaleDateString('es-ES',{month:'short',year:'numeric'}).toUpperCase(), img: url };
       await sb.from('gallery').insert(galToDB(item));
-      await reload(); setNewLabel(''); setNewDate(''); setUploading(false); setToast('Foto añadida');
-    };
-    reader.readAsDataURL(file); e.target.value='';
+      await reload(); setNewLabel(''); setNewDate(''); setToast('Foto añadida');
+    } finally { setUploading(false); }
   };
   const deleteItem = async id => {
     if (!confirm('¿Eliminar esta foto?')) return;
@@ -563,12 +580,11 @@ function Settings({ settings, reload, setToast }) {
     await sb.from('settings').update(settToDB(payload)).eq('id', 1);
     await reload(); setSaving(false); setToast('Ajustes guardados');
   };
-  const changePass = () => {
-    const stored = localStorage.getItem('cp_admin_pass')||'clubparr';
-    if (passForm.current!==stored) { setPassErr('Contraseña actual incorrecta'); return; }
-    if (passForm.new1.length<4) { setPassErr('Mínimo 4 caracteres'); return; }
+  const changePass = async () => {
+    if (passForm.new1.length<6) { setPassErr('Mínimo 6 caracteres'); return; }
     if (passForm.new1!==passForm.new2) { setPassErr('No coinciden'); return; }
-    localStorage.setItem('cp_admin_pass', passForm.new1);
+    const { error } = await sb.auth.updateUser({ password: passForm.new1 });
+    if (error) { setPassErr(error.message); return; }
     setPassForm({current:'',new1:'',new2:''}); setPassErr(''); setToast('Contraseña cambiada');
   };
 
@@ -631,7 +647,7 @@ function Settings({ settings, reload, setToast }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function App() {
-  const [auth, setAuth] = useState(()=>sessionStorage.getItem('cp_auth')==='1');
+  const [auth, setAuth] = useState(null); // null = comprobando sesión
   const [section, setSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
@@ -658,12 +674,18 @@ function App() {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setAuth(!!data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => setAuth(!!session));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   useEffect(() => { if (auth) loadAll(); }, [auth]);
 
-  const login = () => { sessionStorage.setItem('cp_auth','1'); setAuth(true); };
-  const logout = () => { sessionStorage.removeItem('cp_auth'); setAuth(false); };
+  const logout = async () => { await sb.auth.signOut(); };
 
-  if (!auth) return <Login onLogin={login}/>;
+  if (auth === null) return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0D0D0D' }}><Spinner/></div>;
+  if (!auth) return <Login/>;
 
   const sections = {
     dashboard: <Dashboard events={events} products={products} gallery={gallery} reservations={reservations} setSection={setSection}/>,

@@ -1068,30 +1068,22 @@ function App() {
 
   // Save reservation to Supabase (critical); fire email notification in background
   const handleReserve = async (eventObj, formData) => {
+    // Guarda la reserva y descuenta una plaza mediante la función segura del
+    // servidor (reserve_event). El público ya no escribe directo en las tablas.
     try {
-      await sb.from('reservations').insert({
-        event_id: eventObj.id || null,
-        event_title: eventObj.title,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone || null,
-        note: formData.note || null,
+      await sb.rpc('reserve_event', {
+        p_event_id: eventObj.id || null,
+        p_event_title: eventObj.title,
+        p_name: formData.name,
+        p_email: formData.email,
+        p_phone: formData.phone || null,
+        p_note: formData.note || null,
       });
-    } catch (e) {
-      console.error('Supabase insert error:', e);
-    }
-    // Decrement spots on the event (read-modify-write — clamps at 0)
-    if (eventObj.id) {
-      try {
-        const { data: row } = await sb.from('events').select('spots').eq('id', eventObj.id).single();
-        if (row && row.spots > 0) {
-          const newSpots = row.spots - 1;
-          await sb.from('events').update({ spots: newSpots }).eq('id', eventObj.id);
-          setSbEvents(prev => prev ? prev.map(e => e.id === eventObj.id ? { ...e, spots: newSpots } : e) : prev);
-        }
-      } catch (e) {
-        console.warn('Spots decrement failed:', e);
+      if (eventObj.id) {
+        setSbEvents(prev => prev ? prev.map(e => e.id === eventObj.id && e.spots > 0 ? { ...e, spots: e.spots - 1 } : e) : prev);
       }
+    } catch (e) {
+      console.error('Reserva error:', e);
     }
     // Fire-and-forget email notification (Web3Forms) — never blocks confirmation
     const ctrl = new AbortController();
