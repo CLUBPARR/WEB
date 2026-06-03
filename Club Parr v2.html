@@ -1115,7 +1115,7 @@ function App() {
       <Hero tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
       <ClubSection tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
       <EventsSection tweaks={tweaks} events={liveEvents} onReserve={setReserveEvent} />
-      {/* <GallerySection tweaks={tweaks} items={liveGallery} /> — oculta hasta tener sesiones reales que mostrar */}
+      <GallerySection tweaks={tweaks} items={liveGallery} />
       <ShopSection tweaks={tweaks} products={liveProducts} onAdd={addToCart} onOpenProduct={setProductDetail} />
       <Footer tweaks={tweaks} settings={sbSettings} texts={parseTexts(sbSettings?.manifesto)} />
       {cartOpen && <CartDrawer cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={updateQty} tweaks={tweaks} />}
