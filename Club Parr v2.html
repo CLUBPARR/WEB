@@ -566,14 +566,51 @@ function EventRow({ ev, tweaks, onReserve, idx }) {
 const HEIGHTS = [360, 240, 300, 280, 320, 260];
 const BGSLIST = ["#1C1814","#2E2420","#161616","#241E18","#1A1614","#201A16"];
 
-function GallerySection({ tweaks, items: rawItems }) {
+function GalleryPhoto({ item, tweaks }) {
+  return (
+    <div className={`reveal reveal-l`}
+      style={{ marginBottom: 8, breakInside: 'avoid', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
+    >
+      <div style={{ height: item.h, background: item.img ? `url(${item.img}) center/cover no-repeat` : item.bg, position: 'relative', overflow: 'hidden' }}
+        onMouseEnter={e => {
+          e.currentTarget.querySelector('.gal-overlay').style.opacity = '1';
+          e.currentTarget.querySelector('.gal-logo').style.opacity = '0.15';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.querySelector('.gal-overlay').style.opacity = '0';
+          e.currentTarget.querySelector('.gal-logo').style.opacity = '0.05';
+        }}
+      >
+        <div className="gal-logo logo-red" style={{ position: 'absolute', inset: 0, opacity: 0.05, transition: 'opacity 0.3s' }}/>
+        <div className="gal-overlay" style={{
+          position: 'absolute', inset: 0, background: `${tweaks.accentColor}CC`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: 0, transition: 'opacity 0.3s',
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Playfair Display', fontWeight: 800, fontSize: 16, color: '#fff', marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontFamily: 'Space Mono', fontSize: 9, color: '#fff', opacity: 0.8, letterSpacing: '0.1em' }}>{item.date}</div>
+          </div>
+        </div>
+        <div style={{ position: 'absolute', bottom: 8, left: 12, fontFamily: 'Space Mono', fontSize: 8, color: 'rgba(245,240,232,0.3)', letterSpacing: '0.1em' }}>{item.date}</div>
+      </div>
+    </div>
+  );
+}
+
+function GallerySection({ tweaks, items: rawItems, events }) {
   useReveal();
   const sourceItems = rawItems || GALLERY_ITEMS;
-  const items = sourceItems.map((g, i) => ({
-    ...g,
-    h: HEIGHTS[i % HEIGHTS.length],
-    bg: BGSLIST[i % BGSLIST.length],
-  }));
+  const withStyle = (arr) => arr.map((g, i) => ({ ...g, h: HEIGHTS[i % HEIGHTS.length], bg: BGSLIST[i % BGSLIST.length] }));
+  // Agrupar las fotos por evento finalizado; las que no tienen evento van a un grupo aparte.
+  const groups = [];
+  (events || []).forEach(ev => {
+    const photos = sourceItems.filter(g => g.eventId === ev.id);
+    if (photos.length) groups.push({ key: 'ev' + ev.id, title: ev.title, meta: `Finalizado · ${ev.date} ${ev.month}`, photos: withStyle(photos) });
+  });
+  const ungrouped = sourceItems.filter(g => !g.eventId);
+  if (ungrouped.length) groups.push({ key: 'otros', title: null, meta: null, photos: withStyle(ungrouped) });
+  if (!groups.length) return null;
   return (
     <section id="galeria" style={{ marginLeft: 64, background: tweaks.paperColor }}>
       <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr' }}>
@@ -586,37 +623,19 @@ function GallerySection({ tweaks, items: rawItems }) {
               Sesiones<br/><span style={{ color: tweaks.accentColor }}>Pasadas</span>
             </div>
           </div>
-          <div style={{ columns: 3, columnGap: 8 }}>
-            {items.map((item, i) => (
-              <div key={i} className={`reveal reveal-l`}
-                style={{ marginBottom: 8, breakInside: 'avoid', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
-              >
-                <div style={{ height: item.h, background: item.img ? `url(${item.img}) center/cover no-repeat` : item.bg, position: 'relative', overflow: 'hidden' }}
-                  onMouseEnter={e => {
-                    e.currentTarget.querySelector('.gal-overlay').style.opacity = '1';
-                    e.currentTarget.querySelector('.gal-logo').style.opacity = '0.15';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.querySelector('.gal-overlay').style.opacity = '0';
-                    e.currentTarget.querySelector('.gal-logo').style.opacity = '0.05';
-                  }}
-                >
-                  <div className="gal-logo logo-red" style={{ position: 'absolute', inset: 0, opacity: 0.05, transition: 'opacity 0.3s' }}/>
-                  <div className="gal-overlay" style={{
-                    position: 'absolute', inset: 0, background: `${tweaks.accentColor}CC`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: 0, transition: 'opacity 0.3s',
-                  }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontFamily: 'Playfair Display', fontWeight: 800, fontSize: 16, color: '#fff', marginBottom: 4 }}>{item.label}</div>
-                      <div style={{ fontFamily: 'Space Mono', fontSize: 9, color: '#fff', opacity: 0.8, letterSpacing: '0.1em' }}>{item.date}</div>
-                    </div>
-                  </div>
-                  <div style={{ position: 'absolute', bottom: 8, left: 12, fontFamily: 'Space Mono', fontSize: 8, color: 'rgba(245,240,232,0.3)', letterSpacing: '0.1em' }}>{item.date}</div>
+          {groups.map(group => (
+            <div key={group.key} style={{ marginBottom: 56 }}>
+              {group.title && (
+                <div className="reveal" style={{ marginBottom: 20, display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(13,13,13,0.1)', paddingBottom: 12 }}>
+                  <span style={{ fontFamily: 'Playfair Display', fontWeight: 800, fontSize: 26 }}>{group.title}</span>
+                  <span style={{ fontFamily: 'Space Mono', fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: tweaks.accentColor }}>{group.meta}</span>
                 </div>
+              )}
+              <div style={{ columns: 3, columnGap: 8 }}>
+                {group.photos.map((item, i) => <GalleryPhoto key={item.id != null ? item.id : i} item={item} tweaks={tweaks} />)}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -1013,9 +1032,9 @@ function TweaksPanel({ tweaks, setTweaks }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 // ─── ADAPTERS ─────────────────────────────────────────────────────────────────
-const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, img: r.img||null });
+const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, finished: !!r.finished, img: r.img||null });
 const prodFromDB = r => ({ id: r.id, name: r.name, price: r.price, type: r.type, desc: r.descripcion||'', bg: r.bg, imgs: r.imgs||[], sizes: r.sizes||['XS','S','M','L','XL','XXL'], active: r.active });
-const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null });
+const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null, eventId: r.event_id||null });
 
 function App() {
   const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
@@ -1054,6 +1073,9 @@ function App() {
   const liveEvents   = sbEvents   || EVENTS;
   const liveProducts = sbProducts || PRODUCTS;
   const liveGallery  = sbGallery  || GALLERY_ITEMS;
+  // Próximos = no finalizados; los finalizados pasan a la galería como sesiones pasadas
+  const upcomingEvents = liveEvents.filter(e => !e.finished);
+  const pastEvents     = liveEvents.filter(e => e.finished);
 
   useEffect(() => { localStorage.setItem('cp2_cart', JSON.stringify(cart)); }, [cart]);
 
@@ -1114,8 +1136,8 @@ function App() {
       <SideNav cartCount={cartCount} onCartOpen={() => setCartOpen(true)} tweaks={tweaks} />
       <Hero tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
       <ClubSection tweaks={tweaks} texts={parseTexts(sbSettings?.manifesto)} />
-      <EventsSection tweaks={tweaks} events={liveEvents} onReserve={setReserveEvent} />
-      <GallerySection tweaks={tweaks} items={liveGallery} />
+      <EventsSection tweaks={tweaks} events={upcomingEvents} onReserve={setReserveEvent} />
+      <GallerySection tweaks={tweaks} items={liveGallery} events={pastEvents} />
       <ShopSection tweaks={tweaks} products={liveProducts} onAdd={addToCart} onOpenProduct={setProductDetail} />
       <Footer tweaks={tweaks} settings={sbSettings} texts={parseTexts(sbSettings?.manifesto)} />
       {cartOpen && <CartDrawer cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={updateQty} tweaks={tweaks} />}

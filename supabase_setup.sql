@@ -62,6 +62,10 @@ create table if not exists settings (
 );
 insert into settings (id) values (1) on conflict (id) do nothing;
 
+-- ─── COLUMNAS NUEVAS (galería por evento + evento finalizado) ────────────────
+alter table events  add column if not exists finished boolean default false;
+alter table gallery add column if not exists event_id bigint references events(id) on delete set null;
+
 -- ─── ACTIVAR ROW LEVEL SECURITY ─────────────────────────────────────────────
 alter table events       enable row level security;
 alter table products     enable row level security;

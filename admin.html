@@ -50,12 +50,12 @@ async function uploadToStorage(file) {
 }
 
 // ─── ADAPTERS ─────────────────────────────────────────────────────────────────
-const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, img: r.img||null });
-const evToDB    = e => ({ date: e.date, month: e.month, day: e.day||'SAB', time: e.time, title: e.title, sub: e.sub, descripcion: e.desc, spots: Number(e.spots), total: Number(e.total), price: Number(e.price), tag: e.tag, active: !!e.active, img: e.img||null });
+const evFromDB  = r => ({ id: r.id, date: r.date, month: r.month, day: r.day||'SAB', time: r.time, title: r.title, sub: r.sub||'', desc: r.descripcion||'', spots: r.spots, total: r.total, price: r.price, tag: r.tag||'ART.', active: r.active, finished: !!r.finished, img: r.img||null });
+const evToDB    = e => ({ date: e.date, month: e.month, day: e.day||'SAB', time: e.time, title: e.title, sub: e.sub, descripcion: e.desc, spots: Number(e.spots), total: Number(e.total), price: Number(e.price), tag: e.tag, active: !!e.active, finished: !!e.finished, img: e.img||null });
 const prodFromDB = r => ({ id: r.id, name: r.name, price: r.price, type: r.type, desc: r.descripcion||'', bg: r.bg, imgs: r.imgs||[], sizes: r.sizes||['XS','S','M','L','XL','XXL'], active: r.active });
 const prodToDB   = p => ({ name: p.name, price: Number(p.price), type: p.type, descripcion: p.desc, bg: p.bg, imgs: p.imgs||[], sizes: p.sizes||[], active: !!p.active });
-const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null });
-const galToDB    = g => ({ label: g.label, date: g.date, img: g.img||null });
+const galFromDB  = r => ({ id: r.id, label: r.label, date: r.date||'', img: r.img||null, eventId: r.event_id||null });
+const galToDB    = g => ({ label: g.label, date: g.date, img: g.img||null, event_id: g.eventId||null });
 const settFromDB = r => ({ clubName: r.club_name, city: r.city, email: r.email, instagram: r.instagram, whatsapp: r.whatsapp, manifesto: r.manifesto, accentColor: r.accent_color });
 const settToDB   = s => ({ club_name: s.clubName, city: s.city, email: s.email, instagram: s.instagram, whatsapp: s.whatsapp, manifesto: s.manifesto, accent_color: s.accentColor });
 
@@ -298,7 +298,7 @@ function Dashboard({ events, products, gallery, reservations, setSection }) {
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const TAGS = ['FIL.','LIT.','ART.','MUS.','CIN.','GAS.','OTR.'];
-const emptyEvent = () => ({ date:'01', month:'MAY', day:'SAB', time:'19:00', title:'', sub:'', desc:'', spots:15, total:20, price:10, tag:'ART.', active:true, img:null });
+const emptyEvent = () => ({ date:'01', month:'MAY', day:'SAB', time:'19:00', title:'', sub:'', desc:'', spots:15, total:20, price:10, tag:'ART.', active:true, finished:false, img:null });
 
 function EventsManager({ events, reload, toast, setToast }) {
   const [editing, setEditing] = useState(null);
@@ -329,7 +329,10 @@ function EventsManager({ events, reload, toast, setToast }) {
           <div key={ev.id} style={{ background:'#fff', border:'1px solid var(--border)', padding:'20px 24px', display:'flex', alignItems:'center', gap:24, opacity:ev.active?1:0.5 }}>
             <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:36, color:'#3D7A28', lineHeight:1, minWidth:60 }}>{ev.date}<br/><span style={{ fontSize:12, color:'#0D0D0D', opacity:0.5 }}>{ev.month}</span></div>
             <div style={{ flex:1 }}>
-              <div style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:20 }}>{ev.title||'(sin título)'}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontStyle:'italic', fontSize:20 }}>{ev.title||'(sin título)'}</span>
+                {ev.finished && <span style={{ fontFamily:'Space Mono', fontSize:8, letterSpacing:'0.1em', background:'#0D0D0D', color:'#F5F0E8', padding:'2px 6px' }}>FINALIZADO</span>}
+              </div>
               <div style={{ fontFamily:'Space Mono', fontSize:9, opacity:0.4, marginTop:2 }}>{ev.sub} · {ev.time} · €{ev.price} · {ev.spots}/{ev.total} lugares · {ev.tag}</div>
             </div>
             <Toggle value={ev.active} onChange={()=>toggleActive(ev)} label="Visible"/>
@@ -373,6 +376,7 @@ function EventModal({ ev, onSave, onClose, saving }) {
           <Field label="Lugares libres"><Input type="number" value={form.spots} onChange={f('spots')}/></Field>
         </div>
         <Toggle value={!!form.active} onChange={v=>setForm({...form,active:v})} label="Visible en el sitio"/>
+        <Toggle value={!!form.finished} onChange={v=>setForm({...form,finished:v})} label="Finalizado (pasa a la galería como sesión pasada)"/>
         <div style={{ display:'flex', gap:10, marginTop:28 }}>
           <Btn onClick={()=>onSave(form)} loading={saving}>Guardar evento</Btn>
           <Btn onClick={onClose} variant="secondary">Cancelar</Btn>
@@ -477,18 +481,21 @@ function ProductModal({ p, onSave, onClose, saving }) {
 }
 
 // ─── GALLERY ──────────────────────────────────────────────────────────────────
-function GalleryManager({ gallery, reload, setToast }) {
+function GalleryManager({ gallery, events, reload, setToast }) {
   const fileRef = useRef();
   const [newLabel, setNewLabel] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [newEventId, setNewEventId] = useState('');
   const [uploading, setUploading] = useState(false);
+  const evList = events || [];
+  const evTitle = id => { const e = evList.find(e => String(e.id) === String(id)); return e ? e.title : null; };
 
   const handleUpload = async e => {
     const file = e.target.files[0]; e.target.value=''; if (!file) return;
     setUploading(true);
     try {
       const url = await uploadToStorage(file);
-      const item = { label: newLabel||file.name.replace(/\.[^.]+$/,''), date: newDate||new Date().toLocaleDateString('es-ES',{month:'short',year:'numeric'}).toUpperCase(), img: url };
+      const item = { label: newLabel||file.name.replace(/\.[^.]+$/,''), date: newDate||new Date().toLocaleDateString('es-ES',{month:'short',year:'numeric'}).toUpperCase(), img: url, eventId: newEventId ? Number(newEventId) : null };
       await sb.from('gallery').insert(galToDB(item));
       await reload(); setNewLabel(''); setNewDate(''); setToast('Foto añadida');
     } finally { setUploading(false); }
@@ -500,13 +507,18 @@ function GalleryManager({ gallery, reload, setToast }) {
   };
   const updateItem = async (id, key, val) => {
     await sb.from('gallery').update({ [key]: val }).eq('id', id);
+    await reload();
   };
 
   return (
     <div>
       <PageHeader title="Galería" subtitle={`${gallery.length} fotos`}/>
       <div style={{ background:'#fff', border:'2px dashed rgba(13,13,13,0.15)', padding:'32px', marginBottom:32, textAlign:'center' }}>
-        <div style={{ marginBottom:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, maxWidth:400, margin:'0 auto 16px' }}>
+        <div style={{ marginBottom:16, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, maxWidth:560, margin:'0 auto 16px' }}>
+          <select value={newEventId} onChange={e=>setNewEventId(e.target.value)} style={{ padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:13, fontFamily:'Playfair Display', outline:'none' }}>
+            <option value="">— Evento (opcional) —</option>
+            {evList.map(ev => <option key={ev.id} value={ev.id}>{ev.title}{ev.finished?' ✓':''}</option>)}
+          </select>
           <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} placeholder="Título de la sesión" style={{ padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:13, fontFamily:'Playfair Display', outline:'none' }}/>
           <input value={newDate} onChange={e=>setNewDate(e.target.value)} placeholder="Fecha: MAR 2025" style={{ padding:'10px 12px', border:'1px solid rgba(13,13,13,0.15)', background:'#fff', fontSize:13, fontFamily:'Playfair Display', outline:'none' }}/>
         </div>
@@ -522,7 +534,11 @@ function GalleryManager({ gallery, reload, setToast }) {
             </div>
             <div style={{ padding:'12px' }}>
               <input defaultValue={item.label} onBlur={e=>updateItem(item.id,'label',e.target.value)} style={{ width:'100%', border:'none', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:15, color:'#0D0D0D', background:'transparent', marginBottom:4, outline:'none' }}/>
-              <input defaultValue={item.date} onBlur={e=>updateItem(item.id,'date',e.target.value)} style={{ width:'100%', border:'none', fontFamily:'Space Mono', fontSize:9, color:'#0D0D0D', opacity:0.4, background:'transparent', outline:'none', letterSpacing:'0.1em' }}/>
+              <input defaultValue={item.date} onBlur={e=>updateItem(item.id,'date',e.target.value)} style={{ width:'100%', border:'none', fontFamily:'Space Mono', fontSize:9, color:'#0D0D0D', opacity:0.4, background:'transparent', outline:'none', letterSpacing:'0.1em', marginBottom:6 }}/>
+              <select value={item.eventId||''} onChange={e=>updateItem(item.id,'event_id',e.target.value?Number(e.target.value):null)} style={{ width:'100%', border:'1px solid rgba(13,13,13,0.12)', fontFamily:'Space Mono', fontSize:9, color:'#3D7A28', background:'#F8F5EE', outline:'none', padding:'4px 6px' }}>
+                <option value="">Sin evento</option>
+                {evList.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+              </select>
             </div>
           </div>
         ))}
@@ -693,7 +709,7 @@ function App() {
     dashboard: <Dashboard events={events} products={products} gallery={gallery} reservations={reservations} setSection={setSection}/>,
     events: <EventsManager events={events} reload={loadAll} toast={toast} setToast={setToast}/>,
     products: <ProductsManager products={products} reload={loadAll} setToast={setToast}/>,
-    gallery: <GalleryManager gallery={gallery} reload={loadAll} setToast={setToast}/>,
+    gallery: <GalleryManager gallery={gallery} events={events} reload={loadAll} setToast={setToast}/>,
     reservations: <ReservationsManager reservations={reservations} reload={loadAll} setToast={setToast}/>,
     settings: <Settings settings={settings} reload={loadAll} setToast={setToast}/>,
   };
