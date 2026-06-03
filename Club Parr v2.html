@@ -72,6 +72,9 @@
   .reveal-l { transition-delay: 0.1s; }
   .reveal-m { transition-delay: 0.2s; }
   .reveal-h { transition-delay: 0.35s; }
+  /* Galería tipo mosaico (mantiene la proporción real de cada foto) */
+  .gal-masonry { column-count: 3; column-gap: 8px; }
+  .gal-masonry > div { break-inside: avoid; margin-bottom: 8px; }
 
   @keyframes stamp { 0%{transform:scale(1.4) rotate(-8deg);opacity:0} 60%{transform:scale(0.95) rotate(-1deg);opacity:1} 100%{transform:scale(1) rotate(-2deg);opacity:1} }
   @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:none} }
@@ -116,7 +119,7 @@
     }
 
     /* Gallery: 3 cols → 2 */
-    #galeria div[style*="columns: 3"] { columns: 2 !important; }
+    .gal-masonry { column-count: 2 !important; }
     /* Shop: 3 cols → 2 */
     #tienda div[style*="repeat(3, 1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
 
@@ -146,7 +149,7 @@
 
   @media (max-width: 640px) {
     /* Gallery & Shop → 1 col */
-    #galeria div[style*="columns: 3"] { columns: 1 !important; }
+    .gal-masonry { column-count: 1 !important; }
     #tienda div[style*="repeat(3, 1fr)"] { grid-template-columns: 1fr !important; }
 
     /* Cart drawer full screen */
@@ -569,30 +572,29 @@ const BGSLIST = ["#1C1814","#2E2420","#161616","#241E18","#1A1614","#201A16"];
 function GalleryPhoto({ item, tweaks }) {
   return (
     <div className={`reveal reveal-l`}
-      style={{ marginBottom: 8, breakInside: 'avoid', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
+      style={{ position: 'relative', overflow: 'hidden', cursor: 'pointer', lineHeight: 0 }}
+      onMouseEnter={e => {
+        const ov = e.currentTarget.querySelector('.gal-overlay'); if (ov) ov.style.opacity = '1';
+        const lg = e.currentTarget.querySelector('.gal-logo'); if (lg) lg.style.opacity = '0.15';
+      }}
+      onMouseLeave={e => {
+        const ov = e.currentTarget.querySelector('.gal-overlay'); if (ov) ov.style.opacity = '0';
+        const lg = e.currentTarget.querySelector('.gal-logo'); if (lg) lg.style.opacity = '0.05';
+      }}
     >
-      <div style={{ height: item.h, background: item.img ? `url(${item.img}) center/cover no-repeat` : item.bg, position: 'relative', overflow: 'hidden' }}
-        onMouseEnter={e => {
-          e.currentTarget.querySelector('.gal-overlay').style.opacity = '1';
-          e.currentTarget.querySelector('.gal-logo').style.opacity = '0.15';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.querySelector('.gal-overlay').style.opacity = '0';
-          e.currentTarget.querySelector('.gal-logo').style.opacity = '0.05';
-        }}
-      >
-        <div className="gal-logo logo-red" style={{ position: 'absolute', inset: 0, opacity: 0.05, transition: 'opacity 0.3s' }}/>
-        <div className="gal-overlay" style={{
-          position: 'absolute', inset: 0, background: `${tweaks.accentColor}CC`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: 0, transition: 'opacity 0.3s',
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Playfair Display', fontWeight: 800, fontSize: 16, color: '#fff', marginBottom: 4 }}>{item.label}</div>
-            <div style={{ fontFamily: 'Space Mono', fontSize: 9, color: '#fff', opacity: 0.8, letterSpacing: '0.1em' }}>{item.date}</div>
-          </div>
+      {item.img
+        ? <img src={item.img} alt={item.label || ''} loading="lazy" style={{ width: '100%', height: 'auto', display: 'block' }}/>
+        : <div style={{ height: item.h || 280, background: item.bg }}/>}
+      <div className="gal-logo logo-red" style={{ position: 'absolute', inset: 0, opacity: 0.05, transition: 'opacity 0.3s', pointerEvents: 'none' }}/>
+      <div className="gal-overlay" style={{
+        position: 'absolute', inset: 0, background: `${tweaks.accentColor}CC`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: 0, transition: 'opacity 0.3s', pointerEvents: 'none',
+      }}>
+        <div style={{ textAlign: 'center', lineHeight: 1.4 }}>
+          <div style={{ fontFamily: 'Playfair Display', fontWeight: 800, fontSize: 16, color: '#fff', marginBottom: 4 }}>{item.label}</div>
+          <div style={{ fontFamily: 'Space Mono', fontSize: 9, color: '#fff', opacity: 0.8, letterSpacing: '0.1em' }}>{item.date}</div>
         </div>
-        <div style={{ position: 'absolute', bottom: 8, left: 12, fontFamily: 'Space Mono', fontSize: 8, color: 'rgba(245,240,232,0.3)', letterSpacing: '0.1em' }}>{item.date}</div>
       </div>
     </div>
   );
@@ -631,7 +633,7 @@ function GallerySection({ tweaks, items: rawItems, events }) {
                   <span style={{ fontFamily: 'Space Mono', fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: tweaks.accentColor }}>{group.meta}</span>
                 </div>
               )}
-              <div style={{ columns: 3, columnGap: 8 }}>
+              <div className="gal-masonry">
                 {group.photos.map((item, i) => <GalleryPhoto key={item.id != null ? item.id : i} item={item} tweaks={tweaks} />)}
               </div>
             </div>
