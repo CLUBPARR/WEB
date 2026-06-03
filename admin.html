@@ -33,6 +33,10 @@ const SB_URL = 'https://yeyuqwaqitaysyyidiwa.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlleXVxd2FxaXRheXN5eWlkaXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNDcyMzMsImV4cCI6MjA4NzYyMzIzM30.0D3VBaL6JKxHYxec_FdNEvZvG7AWSTKDUGzBd42H-wU';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
+// Email fijo de la cuenta de admin (creada una sola vez en Supabase → Auth).
+// El login solo pide la CONTRASEÑA; este email se usa por dentro.
+const ADMIN_EMAIL = 'admin@clubparr.com';
+
 // ─── SUBIR IMAGEN A STORAGE ────────────────────────────────────────────────────
 // Sube el archivo al bucket "media" y devuelve la URL pública (un texto corto).
 // Antes guardábamos la foto entera como base64 en la BD: pesaba demasiado y fallaba.
@@ -178,7 +182,6 @@ function SingleImageUploader({ value, onChange, label='Imagen', height=120 }) {
 
 // ─── LOGIN ─────────────────────────────────────────────────────────────────────
 function Login() {
-  const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [err, setErr] = useState(false);
   const [shake, setShake] = useState(false);
@@ -186,7 +189,7 @@ function Login() {
   const handleSubmit = async e => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    const { error } = await sb.auth.signInWithPassword({ email: ADMIN_EMAIL, password: pass });
     setBusy(false);
     if (error) { setErr(true); setShake(true); setTimeout(()=>setShake(false),500); }
     // Si el login es correcto, onAuthStateChange en App actualiza la sesión solo.
@@ -199,9 +202,8 @@ function Login() {
           <h1 style={{ fontFamily:'Barlow Condensed', fontWeight:900, fontSize:32, color:'#F5F0E8', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Panel Admin</h1>
           <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#F5F0E8', opacity:0.35, letterSpacing:'0.1em', marginBottom:40 }}>CLUB PARR — MADRID</p>
           <form onSubmit={handleSubmit} style={{ width:'100%' }}>
-            <input type="email" placeholder="Email" value={email} onChange={e=>{setEmail(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:14, letterSpacing:'0.05em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }} autoFocus/>
-            <input type="password" placeholder="Contraseña" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:16, letterSpacing:'0.15em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }}/>
-            {err && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginBottom:12 }}>Email o contraseña incorrectos</p>}
+            <input type="password" placeholder="Contraseña" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} style={{ width:'100%', padding:'16px 20px', background:'#1A1A1A', border:`1px solid ${err?'#C0392B':'rgba(245,240,232,0.1)'}`, color:'#F5F0E8', fontSize:16, letterSpacing:'0.15em', marginBottom:12, fontFamily:'Space Mono', outline:'none' }} autoFocus/>
+            {err && <p style={{ fontFamily:'Space Mono', fontSize:10, color:'#C0392B', marginBottom:12 }}>Contraseña incorrecta</p>}
             <button type="submit" disabled={busy} style={{ width:'100%', padding:'16px', background:'#3D7A28', color:'#fff', fontFamily:'Barlow Condensed', fontWeight:700, fontSize:14, letterSpacing:'0.2em', textTransform:'uppercase', border:'none', cursor:'pointer', opacity:busy?0.6:1 }}>{busy?'Entrando…':'Entrar →'}</button>
           </form>
           <p style={{ fontFamily:'Space Mono', fontSize:9, color:'#F5F0E8', opacity:0.2, marginTop:20, textAlign:'center', lineHeight:1.7 }}>Acceso solo para usuarios autorizados</p>
